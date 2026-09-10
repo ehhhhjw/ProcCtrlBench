@@ -1,0 +1,61 @@
+version: 1
+
+# Copy this file, fill in your own endpoint / key / dataset paths, and keep the
+# filled-in copy out of version control. Every value below is a placeholder.
+
+model:
+  # Any OpenAI-compatible endpoint, shared by the three benchmark adapters below.
+  base_url: "https://api.example.com/v1"
+  # Prefer supplying this through the environment instead of committing it:
+  #   export PROCCTRL_API_KEY=...
+  api_key: "${PROCCTRL_API_KEY}"
+  model: "your-model-id"
+
+acoder:
+  enabled: true
+  # Local acoder binary to detect before launching benchmark jobs.
+  bin: "acoder"
+  # auto:
+  # - Claude-family models -> claude
+  # - Qwen-family models -> opencode
+  # - GPT/OpenAI-family models -> codex
+  agent: "auto"
+  yolo: true
+  debug: false
+  no_banner: true
+  no_upgrade: true
+  timeout_sec: 1800
+
+benchmarks:
+  android_bench:
+    enabled: true
+    # Or set PROCCTRL_ANDROID_BENCH_REPO
+    repo_path: "../android-bench"
+    tasks_filter: "dataset/tasks/v1_tasks.yaml"
+    workers: 4
+    images: "local"
+    run_name_prefix: "procctrlbench"
+    provider_prefix: "openai"
+
+  terminal_bench:
+    enabled: true
+    repo_path: "/tmp/terminal-bench"
+    # Only used when acoder.enabled=false.
+    agent: "auto"
+    dataset_name: "terminal-bench-core"
+    dataset_version: "0.1.1"
+    n_concurrent: 8
+    # Override task-level test timeout for slow tasks in terminal-bench-core 0.1.1
+    # such as play-zork, whose cached dataset entry is 60s.
+    global_test_timeout_sec: 180
+    cleanup: true
+    output_path: "runs"
+
+  swe_bench_verified:
+    enabled: true
+    # Or set PROCCTRL_SWEBENCH_PROJECTS_ROOT / _QUESTIONS / _EXPERIMENTS_ROOT
+    projects_root: "../swebench_verified_projects/projects"
+    questions_path: "../swebench_verified_projects/instance_questions.json"
+    experiments_root: "../swe-bench-experiments/evaluation/verified"
+    scaffold: "openhands"
+    provider_prefix: "openai"

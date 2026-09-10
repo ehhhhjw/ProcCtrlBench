@@ -1,0 +1,41 @@
+{
+  "name": "procctrlbench",
+  "version": "1.0.0",
+  "description": "ProcCtrlBench: evaluating process-level defects and control preservation in LLM coding agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "analyze:project": "ts-node scripts/build-file-graph.ts",
+    "build": "tsc",
+    "example": "ts-node example/evaluate-session.ts",
+    "paper:evaluate": "ts-node scripts/run-paper-offline-experiments.ts",
+    "paper:artifacts": "ts-node scripts/generate-paper-artifacts.ts",
+    "smoke:swebench": "ts-node scripts/run-random-swebench-verified-smoke.ts",
+    "test": "npm run build && node --test tests/runtime-guard/*.test.js"
+  },
+  "keywords": [
+    "agent",
+    "evaluation",
+    "benchmark",
+    "coding-agent",
+    "llm",
+    "process-evaluation",
+    "control-preservation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tree-sitter": "^0.20.1",
+    "tree-sitter-typescript": "^0.20.1",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "tree-sitter-c-sharp": "^0.20.0",
+    "tree-sitter-cpp": "^0.20.5",
+    "tree-sitter-java": "^0.20.2",
+    "tree-sitter-javascript": "^0.20.4",
+    "tree-sitter-python": "^0.20.4"
+  }
+}

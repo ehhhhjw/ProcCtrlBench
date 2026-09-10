@@ -1,0 +1,112 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABS/PATH/TO/benchmark_mvp/tools/claude-code-runtime-guard/bin/cc-guard-hook --config /ABS/PATH/TO/TARGET_PROJECT/.claude/guard.config.example.json",
+            "timeout": 120,
+            "statusMessage": "Runtime guard checking execution risks..."
+          }
+        ]
+      }
+    ]
+  }
+}

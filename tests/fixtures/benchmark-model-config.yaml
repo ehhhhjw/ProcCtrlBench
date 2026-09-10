@@ -1,0 +1,22 @@
+version: 1
+model:
+  base_url: "https://api.example.com/v1"
+  api_key: "${PROC_BENCH_TEST_API_KEY}"
+  model: "qwen3-coder-plus"
+acoder:
+  enabled: true
+  bin: "acoder"
+  agent: "auto"
+  yolo: true
+  no_banner: true
+  no_upgrade: true
+benchmarks:
+  android_bench:
+    repo_path: "/tmp/android-bench"
+  terminal_bench:
+    repo_path: "/tmp/terminal-bench"
+    global_test_timeout_sec: 180
+  swe_bench_verified:
+    projects_root: "/tmp/swe-projects"
+    questions_path: "/tmp/swe-questions.json"
+    experiments_root: "/tmp/swe-experiments"

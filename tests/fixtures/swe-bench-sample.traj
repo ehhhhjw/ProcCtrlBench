@@ -1,0 +1,19 @@
+{
+  "environment": "swe_main",
+  "trajectory": [
+    {
+      "action": "python -m pytest tests/test_one.py",
+      "observation": "Traceback (most recent call last):\nAssertionError",
+      "response": "Let's run the failing test.\n\n<command>\npython -m pytest tests/test_one.py\n</command>",
+      "state": "{\"open_file\": \"n/a\", \"working_dir\": \"/repo\"}",
+      "thought": "Let's run the failing test."
+    },
+    {
+      "action": "edit 1:1\nprint(\"fixed\")\nend_of_edit",
+      "observation": "[File: /repo/app.py]\n1: print(\"fixed\")",
+      "response": "Apply the fix.\n\n<command>\nedit 1:1\nprint(\"fixed\")\nend_of_edit\n</command>",
+      "state": "{\"open_file\": \"/repo/app.py\", \"working_dir\": \"/repo\"}",
+      "thought": "Apply the fix."
+    }
+  ]
+}

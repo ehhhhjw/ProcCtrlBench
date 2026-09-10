@@ -1,0 +1,11 @@
+{"timestamp":"2026-04-28T00:00:00.000Z","type":"session_meta","payload":{"id":"sample-session"}}
+{"timestamp":"2026-04-28T00:00:01.000Z","type":"event_msg","payload":{"type":"user_message","message":"Fix the failing test."}}
+{"timestamp":"2026-04-28T00:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Inspecting the repository."}]}}
+{"timestamp":"2026-04-28T00:00:03.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"rg -n \\\"failing\\\" tests\",\"workdir\":\"/tmp/sample\"}","call_id":"call_one"}}
+{"timestamp":"2026-04-28T00:00:04.000Z","type":"event_msg","payload":{"type":"exec_command_end","call_id":"call_one","aggregated_output":"tests/test_sample.py:10:def test_issue()","exit_code":0,"status":"completed"}}
+{"timestamp":"2026-04-28T00:00:04.100Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_one","output":"tests/test_sample.py:10:def test_issue()"}}
+{"timestamp":"2026-04-28T00:00:05.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Running pytest on the target test."}}
+{"timestamp":"2026-04-28T00:00:06.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"python -m pytest tests/test_sample.py::test_issue\",\"workdir\":\"/tmp/sample\"}","call_id":"call_two"}}
+{"timestamp":"2026-04-28T00:00:07.000Z","type":"event_msg","payload":{"type":"exec_command_end","call_id":"call_two","aggregated_output":"FAILED tests/test_sample.py::test_issue","exit_code":1,"status":"failed"}}
+{"timestamp":"2026-04-28T00:00:07.100Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_two","output":"FAILED tests/test_sample.py::test_issue"}}
+{"timestamp":"2026-04-28T00:00:08.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The failing pytest target reproduces locally."}]}}

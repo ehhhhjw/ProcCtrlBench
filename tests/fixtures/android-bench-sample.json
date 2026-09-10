@@ -1,0 +1,46 @@
+{
+  "info": {
+    "exit_status": "Submitted",
+    "model_stats": {
+      "instance_cost": 0.12
+    }
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "system prompt"
+    },
+    {
+      "role": "user",
+      "content": "solve task"
+    },
+    {
+      "role": "assistant",
+      "content": "THOUGHT: inspect\n\n```bash\npwd\n```",
+      "extra": {
+        "response": {
+          "model": "claude-opus-4-6",
+          "choices": [
+            {
+              "finish_reason": "stop"
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 100,
+            "completion_tokens": 20,
+            "total_tokens": 120
+          }
+        }
+      }
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "<returncode>0</returncode>\n<output>\n/workspace/testbed\n</output>"
+        }
+      ]
+    }
+  ]
+}

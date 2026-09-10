@@ -1,0 +1,93 @@
+import { EvaluationConfig } from '../types/evaluation.types';
+
+/**
+ * 默认评估配置
+ */
+export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
+  // 阈值配置
+  thresholds: {
+    ghostContext: {
+      warningTokens: 512,
+      errorTokens: 1024,
+    },
+    oversizedRules: {
+      warningTokens: 2000,
+      errorTokens: 4000,
+      warningRatio: 0.20,
+      errorRatio: 0.35,
+    },
+    thrashing: {
+      windowThreshold: 0.75, // 75%的窗口占用（参考验证版文档，提前预警）
+      compressionLookAhead: 2, // 向后看2步
+    },
+    toolChain: {
+      repetitiveWarningCount: 6,
+      repetitiveErrorCount: 10,
+      cyclicWarningCount: 3,
+      cyclicErrorCount: 5,
+    },
+    longChain: {
+      warningLength: 12,
+      errorLength: 20,
+      simpleWarningLength: 25,
+      simpleErrorLength: 40,
+    },
+  },
+  // 上下文窗口大小 (Claude 4.6 Opus的窗口大小)
+  contextWindowSize: 200000,
+  riskModel: {
+    warningThreshold: 0.55,
+    errorThreshold: 0.8,
+    calibrationBucketCount: 10,
+    metricPriors: {
+      ghostContext: 0.42,
+      oversizedRules: 0.32,
+      thrashing: 0.38,
+      toolCallChain: 0.4,
+      deadStep: 0.36,
+      duplicateStep: 0.38,
+      wrapperWorkflow: 0.28,
+      contextCoupling: 0.34,
+      longChain: 0.44,
+      inconsistentToolInterface: 0.3,
+      weakTool: 0.27,
+    },
+    evidenceWeights: {
+      weak: 0.35,
+      medium: 0.6,
+      strong: 0.82,
+    },
+    severityAnchors: {
+      info: 0.2,
+      warning: 0.6,
+      error: 0.82,
+      critical: 0.92,
+    },
+  },
+  controlPreservation: {
+    weights: {
+      interpretability: 0.22,
+      interruptibility: 0.16,
+      corrigibility: 0.24,
+      reversibility: 0.18,
+      handoffAwareness: 0.2,
+    },
+  },
+  detectorCalibration: {
+    profileName: 'default-heuristic-v1',
+    calibrationSource: 'built-in-defaults',
+    baselineScores: {
+      ghostContext: 0.34,
+      oversizedRules: 0.26,
+      thrashing: 0.33,
+      toolCallChain: 0.31,
+      deadStep: 0.28,
+      duplicateStep: 0.27,
+      wrapperWorkflow: 0.24,
+      contextCoupling: 0.25,
+      longChain: 0.36,
+      inconsistentToolInterface: 0.23,
+      weakTool: 0.22,
+    },
+  },
+};

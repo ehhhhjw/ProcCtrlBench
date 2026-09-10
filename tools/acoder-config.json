@@ -1,0 +1,37 @@
+[
+  {
+    "workspaceDir": ".",
+    "files": [
+      "detectors/DuplicateStepDetector.ts",
+      "detectors/CouplingDetector.ts",
+      "detectors/DeadStepDetector.ts",
+      "detectors/OversizedRulesDetector.ts",
+      "detectors/GhostContextDetector.ts",
+      "detectors/WeakToolDetector.ts",
+      "detectors/InterfaceConsistencyDetector.ts",
+      "detectors/WrapperDetector.ts",
+      "detectors/ThrashingDetector.ts",
+      "detectors/LongChainDetector.ts",
+      "detectors/ToolChainDetector.ts",
+      "index.ts",
+      "scoring/ReportGenerator.ts",
+      "scoring/ScoreCalculator.ts",
+      "evaluators/ToolEcosystemEvaluator.ts",
+      "evaluators/ContextManagementEvaluator.ts",
+      "evaluators/WorkflowArchitectureEvaluator.ts",
+      "evaluators/ToolUseEfficiencyEvaluator.ts",
+      "evaluators/TaskOutcomeEvaluator.ts",
+      "evaluators/BaseEvaluator.ts",
+      "AgentEvaluator.ts",
+      "config/evaluation.config.ts",
+      "types/externals.d.ts",
+      "types/evaluation.types.ts",
+      "types/metrics.types.ts",
+      "analyzers/EventStreamConverter.ts",
+      "analyzers/ContentSimilarityAnalyzer.ts",
+      "analyzers/AstAnalyzer.ts",
+      "analyzers/FileAssociationLoader.ts",
+      "benchmark/BenchmarkRunner.ts"
+    ]
+  }
+]

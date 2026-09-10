@@ -1,0 +1,25 @@
+{
+  "name": "claude-code-jsonl-parser",
+  "version": "1.0.0",
+  "description": "JSONL parser and analyzer for Claude Code session data",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "ts-node tests/test.ts",
+    "example": "ts-node tests/example.ts"
+  },
+  "keywords": [
+    "jsonl",
+    "parser",
+    "claude-code",
+    "session-analysis"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "projectPath": "/path/to/the/codebase/the/agent/worked/on",
+  "jsonlPath": "/path/to/the/agent/session/transcript.jsonl",
+  "outputDir": "output",
+  "includeExtensions": [
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".py",
+    ".java",
+    ".kt",
+    ".kts",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".hpp",
+    ".h",
+    ".cs"
+  ],
+  "excludeDirs": [
+    "node_modules",
+    "dist",
+    "build",
+    "output",
+    ".git",
+    ".idea",
+    ".vscode",
+    ".venv",
+    "coverage"
+  ],
+  "enableSymbolRelations": false,
+  "relatedFilesDataPath": "",
+  "outputFiles": {
+    "fileGraph": "file-graph.json",
+    "projectAst": "project-ast.json"
+  }
+}

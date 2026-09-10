@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+ClaudeCodeStructure/node_modules/
+
+# Build output
+dist/
+
+# Experiment data and results (not distributed; see docs/reproducing_paper_results.md)
+output/
+output-*/
+output_example/
+external_data/
+results/
+
+# Local-only upstream tooling. AST_Tree_Graph is an optional producer of the
+# related-files enrichment data that `relatedFilesDataPath` can point at; the
+# evaluation pipeline runs without it. Kept out of the published tree.
+tree-sitter-fold/
+
+# Local agent / tooling state
+.claude/
+.cc-guard/
+.omx/
+.e2eAjx/
+.bench_env/
+.tmp_pdfenv/
+
+# OS / editor cruft
+.DS_Store
+*.swp
