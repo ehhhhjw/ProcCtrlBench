@@ -2,57 +2,60 @@ import * as fs from 'fs';
 import { PROCCTRL_DEFECT_KEYS, ProcCtrlDefectKey } from '../benchmark/ProcCtrlScorecard';
 
 /**
- * 过程级人工标注集的读取与校验。
+ * Loading and validation of the process-level manual annotation set.
  *
- * 对应论文附录 B.1 / B.4 的标注协议：
- * - 每条轨迹由两名标注者独立标注 11 类缺陷；
- * - 每个判断取值 present / absent / exempt（豁免指模式匹配但在任务语境下合理）；
- * - 两人分歧时由第三名评审仲裁，仲裁结果作为最终标签；
- * - 一致性在仲裁前计算（见 PaperMetrics.computeAgreementStats）。
+ * Implements the annotation protocol from Appendix B.1 / B.4 of the paper:
+ * - Each trajectory is independently annotated for the 11 defect classes by two annotators;
+ * - Each judgment takes the value present / absent / exempt (exempt means the pattern
+ *   matches but is reasonable in the task context);
+ * - When the two annotators disagree, a third reviewer adjudicates, and the adjudicated
+ *   result becomes the final label;
+ * - Agreement is computed before adjudication (see PaperMetrics.computeAgreementStats).
  *
- * 本仓库不包含标注数据本身，只定义接口与校验规则。
+ * This repository does not contain the annotation data itself; it only defines the
+ * interfaces and validation rules.
  */
 
 export const ANNOTATION_SCHEMA_VERSION = 'procctrlbench-annotation-v1';
 
-/** 单个缺陷判断的三值取值 */
+/** The three possible values of a single defect judgment */
 export type AnnotationJudgment = 'present' | 'absent' | 'exempt';
 
 export const ANNOTATION_JUDGMENTS: readonly AnnotationJudgment[] = ['present', 'absent', 'exempt'];
 
 export interface DefectAnnotation {
-  /** 标注者 A 的判断 */
+  /** Judgment from annotator A */
   annotatorA: AnnotationJudgment;
-  /** 标注者 B 的判断 */
+  /** Judgment from annotator B */
   annotatorB: AnnotationJudgment;
-  /** 仲裁结果；两人一致时可省略 */
+  /** Adjudicated result; may be omitted when the two annotators agree */
   adjudicated?: AnnotationJudgment;
-  /** 触发证据摘要 */
+  /** Summary of the triggering evidence */
   evidence?: string;
-  /** 豁免理由 */
+  /** Rationale for the exemption */
   exemptionRationale?: string;
 }
 
 export interface AnnotatedCase {
-  /** 全局唯一的样本标识 */
+  /** Globally unique case identifier */
   caseId: string;
-  /** 任务来源：android-bench / terminal-bench / swe-bench-verified */
+  /** Task source: android-bench / terminal-bench / swe-bench-verified */
   benchmark: string;
   taskId: string;
   trialId?: string;
-  /** 产生该轨迹的 agent-model 系统标识 */
+  /** Identifier of the agent-model system that produced this trajectory */
   system?: string;
-  /** 端点任务是否成功；null 表示日志未记录 */
+  /** Whether the end-to-end task succeeded; null means the log did not record it */
   success: boolean | null;
-  /** 原始轨迹路径，用于与检测器输出对齐 */
+  /** Path to the raw trajectory, used to align with detector output */
   rawPath?: string;
-  /** 逐缺陷标注，键为 11 类缺陷之一 */
+  /** Per-defect annotations, keyed by one of the 11 defect classes */
   annotations: Partial<Record<ProcCtrlDefectKey, DefectAnnotation>>;
 }
 
 export interface AnnotationSet {
   schemaVersion: string;
-  /** 标注集说明，例如标注者背景、标注轮次 */
+  /** Notes about the annotation set, e.g. annotator background or annotation round */
   description?: string;
   cases: AnnotatedCase[];
 }
@@ -65,12 +68,12 @@ export interface AnnotationValidationIssue {
 
 export interface LoadedAnnotationSet {
   set: AnnotationSet;
-  /** 阻断性问题：存在时不应用于产出论文表格 */
+  /** Blocking issues: when present, the set should not be used to produce paper tables */
   errors: AnnotationValidationIssue[];
-  /** 非阻断性问题，例如缺少证据说明 */
+  /** Non-blocking issues, e.g. a missing evidence note */
   warnings: AnnotationValidationIssue[];
   caseCount: number;
-  /** 每类缺陷实际被标注的样本数 */
+  /** Number of cases actually annotated for each defect class */
   coverageByDefect: Record<ProcCtrlDefectKey, number>;
 }
 
@@ -79,9 +82,11 @@ function isJudgment(value: unknown): value is AnnotationJudgment {
 }
 
 /**
- * 解析最终标签。
+ * Resolves the final label.
  *
- * 两人一致时取该判断；不一致时必须有仲裁结果，否则视为未定标签返回 null。
+ * When the two annotators agree, that judgment is used; when they disagree an
+ * adjudicated result is required, otherwise the label is treated as undetermined
+ * and null is returned.
  */
 export function resolveFinalJudgment(annotation: DefectAnnotation): AnnotationJudgment | null {
   if (annotation.adjudicated) {
@@ -94,21 +99,23 @@ export function resolveFinalJudgment(annotation: DefectAnnotation): AnnotationJu
 }
 
 /**
- * 最终标签转为检测评估用的二值真值 y_j。
+ * Converts the final label into the binary ground truth y_j used for detection evaluation.
  *
- * 仅 present 记为 1；exempt 记为 0——豁免的语义是"模式匹配但在任务语境下并非缺陷"，
- * 因此它不是正例。豁免率单独在 Table 5 报告，不混入 precision / recall。
+ * Only present counts as 1; exempt counts as 0 -- the semantics of exempt are "the pattern
+ * matches but it is not a defect in the task context", so it is not a positive example.
+ * The exemption rate is reported separately in Table 5 and is not mixed into
+ * precision / recall.
  */
 export function judgmentToLabel(judgment: AnnotationJudgment): boolean {
   return judgment === 'present';
 }
 
-/** 两名标注者是否分歧（仲裁前） */
+/** Whether the two annotators disagree (before adjudication) */
 export function hasDisagreement(annotation: DefectAnnotation): boolean {
   return annotation.annotatorA !== annotation.annotatorB;
 }
 
-/** 校验标注集结构，返回阻断性与非阻断性问题 */
+/** Validates the annotation set structure, returning blocking and non-blocking issues */
 export function validateAnnotationSet(set: AnnotationSet): {
   errors: AnnotationValidationIssue[];
   warnings: AnnotationValidationIssue[];
@@ -216,7 +223,7 @@ export function validateAnnotationSet(set: AnnotationSet): {
   return { errors, warnings, coverageByDefect };
 }
 
-/** 从 JSON 文件读取并校验标注集 */
+/** Loads and validates an annotation set from a JSON file */
 export function loadAnnotationSet(filePath: string): LoadedAnnotationSet {
   if (!fs.existsSync(filePath)) {
     throw new Error(
@@ -241,7 +248,7 @@ export function loadAnnotationSet(filePath: string): LoadedAnnotationSet {
   };
 }
 
-/** 展平为逐 (case, defect) 的标签行，便于与检测器输出做连接 */
+/** Flattened per-(case, defect) label rows, for joining against detector output */
 export interface FlatAnnotationRow {
   caseId: string;
   benchmark: string;
@@ -252,7 +259,7 @@ export interface FlatAnnotationRow {
   annotatorA: AnnotationJudgment;
   annotatorB: AnnotationJudgment;
   finalJudgment: AnnotationJudgment;
-  /** 检测评估用的二值真值 */
+  /** Binary ground truth used for detection evaluation */
   label: boolean;
   exempt: boolean;
   adjudicated: boolean;
@@ -269,7 +276,8 @@ export function flattenAnnotationSet(set: AnnotationSet): FlatAnnotationRow[] {
       }
       const finalJudgment = resolveFinalJudgment(annotation);
       if (!finalJudgment) {
-        // 分歧未仲裁的条目由 validateAnnotationSet 报错，这里跳过以免污染指标
+        // Unadjudicated disagreements are reported as errors by validateAnnotationSet;
+        // skip them here so they do not pollute the metrics
         continue;
       }
 

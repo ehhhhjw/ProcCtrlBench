@@ -1,27 +1,27 @@
-# Claude Code Runtime Guard 方案
+# The Claude Code Runtime Guard Design
 
-本文给出一个独立于当前评测主流程之外的运行时组件方案。目标不是在任务结束后再做离线评估，而是直接在 Claude Code CLI 执行过程中，基于增量 `jsonl` transcript、项目 AST、related-files 图谱，对 11 个基准做实时监控、预警和过程内纠偏。
+This document presents the design of a runtime component that sits outside the current main evaluation pipeline. The goal is not to perform an offline evaluation once a task has finished, but rather to carry out real-time monitoring, prewarning, and in-process correction for the 11 benchmarks directly during the execution of the Claude Code CLI, on the basis of the incremental `jsonl` transcript, the project AST, and the related-files graph.
 
-## 1. 设计目标
+## 1. Design Goals
 
-- 独立部署：
-  - 不侵入当前 `src/` 主评测逻辑
-  - 作为 sidecar / wrapper 组件单独启停
-- 一键嵌入：
-  - 通过 Claude Code hooks + transcript tailing 接入
-  - 不要求修改 Claude Code 内部源码
-- 可配置：
-  - 11 个基准逐项开关
-  - 每项基准独立策略、阈值、动作等级
-- 低耦合：
-  - AST、related files、运行轨迹分别解耦
-  - 允许只开轨迹规则，不强制依赖全量项目分析
-- 可控干预：
-  - 支持只观察、告警、阻断前提示、自动注入修正建议四种模式
+- Independent deployment:
+  - Does not intrude into the current main evaluation logic under `src/`
+  - Can be started and stopped separately as a sidecar / wrapper component
+- One-click embedding:
+  - Integrated by way of Claude Code hooks + transcript tailing
+  - Does not require modifying the internal source code of Claude Code
+- Configurability:
+  - Each of the 11 benchmarks can be toggled individually
+  - Every benchmark has its own independent policy, thresholds, and action level
+- Low coupling:
+  - The AST, the related files, and the execution trajectory are decoupled from one another
+  - Allows enabling only the trajectory rules, without mandating a dependency on full project analysis
+- Controllable intervention:
+  - Supports four modes: observation only, warning, hinting before blocking, and automatic injection of corrective suggestions
 
-## 2. 组件形态
+## 2. Component Layout
 
-推荐把该组件实现为独立目录，例如：
+It is recommended that the component be implemented as a standalone directory, for example:
 
 ```text
 claude-code-runtime-guard/
@@ -43,20 +43,20 @@ claude-code-runtime-guard/
     traces
 ```
 
-在当前仓库中，可先用文档与配置模板定义组件边界，后续独立抽出成单独仓库或 npm 包。
+Within the current repository, the component boundary can first be defined by means of documentation and configuration templates, and later be extracted into a separate repository or npm package.
 
-## 3. Claude Code CLI 接入方式
+## 3. How to Integrate with the Claude Code CLI
 
-Claude Code 本身具备适合接入该组件的两个关键事实：
+Claude Code itself exhibits two key properties that make it well suited to integrating this component:
 
-- transcript 是增量 append 的 `jsonl`
-- hooks payload 中可以拿到 `session_id`、`transcript_path`、`cwd`
+- The transcript is an incrementally appended `jsonl` file
+- The hooks payload gives access to `session_id`, `transcript_path`, and `cwd`
 
-因此推荐采用“双通道接入”：
+A "dual-channel integration" is therefore recommended:
 
-### 3.1 通道 A：hooks 低延迟拦截
+### 3.1 Channel A: Low-Latency Interception via hooks
 
-用于在关键动作发生前后触发守护逻辑：
+Used to trigger the guard logic immediately before and after critical actions:
 
 - `SessionStart`
 - `UserPromptSubmit`
@@ -67,27 +67,27 @@ Claude Code 本身具备适合接入该组件的两个关键事实：
 - `PreCompact`
 - `Stop`
 
-hooks 的作用不是重建全量历史，而是：
+The purpose of the hooks is not to reconstruct the full history, but rather to:
 
-- 给守护进程发送“当前正在发生什么”的高时效事件
-- 在 `PreToolUse` 阶段执行“阻断前检查”
-- 在 `PreCompact` 阶段做上下文质量评估
+- Send the guard process highly timely events describing "what is happening right now"
+- Perform a "pre-blocking check" at the `PreToolUse` stage
+- Perform a context quality assessment at the `PreCompact` stage
 
-### 3.2 通道 B：transcript tailing 真相回放
+### 3.2 Channel B: Ground-Truth Replay via transcript tailing
 
-hooks 的信息不完整，最终仍要以 transcript 为准。sidecar 持续 tail `jsonl`：
+The information provided by the hooks is incomplete, so the transcript must ultimately remain the source of truth. The sidecar continuously tails the `jsonl` file in order to:
 
-- 读取最新追加事件
-- 增量构建会话状态
-- 与 hooks 事件做对账
-- 做跨步检测、窗口检测、周期检测
+- Read the most recently appended events
+- Build up the session state incrementally
+- Reconcile against the hook events
+- Perform cross-step detection, window detection, and periodicity detection
 
-这能解决两个问题：
+This resolves two problems:
 
-- hooks 只能看到当前动作，看不到完整链路
-- Claude Code 运行时上下文不是 transcript 的简单等价物，需要从事件流重建“有效上下文近似”
+- The hooks can only see the current action, not the complete chain
+- The Claude Code runtime context is not a simple equivalent of the transcript; an "effective context approximation" has to be reconstructed from the event stream
 
-## 4. 守护组件内部架构
+## 4. Internal Architecture of the Guard Component
 
 ```text
 Claude Code CLI
@@ -104,397 +104,397 @@ Claude Code CLI
 
 ### 4.1 Transcript Watcher
 
-职责：
+Responsibilities:
 
-- 监听主 transcript 与 subagent transcript
-- 按 offset 增量读取新行
-- 解析事件并标准化为内部 event stream
+- Watch the main transcript and the subagent transcripts
+- Read new lines incrementally by offset
+- Parse the events and normalize them into an internal event stream
 
 ### 4.2 Session State Store
 
-维护运行时需要的最小状态：
+Maintains the minimal state required at runtime:
 
-- 最近 N 步消息
-- 当前工具调用链
-- 已读文件、已写文件、已改符号
-- 当前任务簇 / 子任务簇
-- 最近压缩边界
-- 当前候选上下文集合
-- 最近一次预警与抑制窗口
+- The most recent N steps of messages
+- The current tool invocation chain
+- The files already read, the files already written, and the symbols already modified
+- The current task cluster / subtask cluster
+- The most recent compaction boundary
+- The current set of candidate context
+- The most recent prewarn and its suppression window
 
 ### 4.3 AST Context Provider
 
-输入：
+Inputs:
 
-- 项目 AST
-- 当前活跃文件
-- 当前工具参数中的路径、符号、行号
+- The project AST
+- The currently active file
+- The paths, symbols, and line numbers in the current tool parameters
 
-输出：
+Outputs:
 
-- 文件邻域
+- The file neighborhood
 - related symbols
-- 读写覆盖范围
-- 调用点 / 定义点关系
+- The read/write coverage
+- Call-site / definition-site relations
 
 ### 4.4 Related Files Provider
 
-把外部 related files 结果并入代码邻域判断。它的角色不是替代 AST，而是补 AST 中难以静态恢复的实现链路。
+Incorporates the external related files results into the code neighborhood judgment. Its role is not to replace the AST, but to make up for those implementation paths that are hard to recover statically within the AST.
 
 ### 4.5 Remediation Engine
 
-不直接改 Claude Code 内部上下文，而是输出可消费的纠偏动作：
+Rather than modifying Claude Code's internal context directly, it emits corrective actions that can be consumed:
 
-- 控制台提示
-- hook stderr 告警
-- 生成 sidecar 建议文件
-- 通过用户消息注入器注入下一轮提示
-- 在 `PreToolUse` 阶段返回阻断意见
+- Console hints
+- hook stderr warnings
+- Generation of a sidecar suggestion file
+- Injection of a hint for the next round by way of the user message injector
+- Return of a blocking opinion at the `PreToolUse` stage
 
-## 5. 干预等级
+## 5. Intervention Levels
 
-建议统一为四级：
+A uniform four-level scheme is recommended:
 
 - `observe`
-  - 只记录，不提示
+  - Records only, gives no hints
 - `warn`
-  - 输出告警，不阻断
+  - Emits a warning without blocking
 - `guard`
-  - 在高风险步骤前给出建议，并要求确认
+  - Gives advice before a high-risk step and requires confirmation
 - `remediate`
-  - 自动生成修复性提示或替代执行建议
+  - Automatically generates a corrective hint or an alternative execution suggestion
 
-## 6. 11 个基准的运行时解决方案
+## 6. Runtime Solutions for the 11 Benchmarks
 
-下面按“检测时机 + 缺陷信号 + 过程内动作”设计。
+The design below is organized as "detection timing + defect signals + in-process actions".
 
 ## 6.1 Ghost Context
 
-### 检测时机
+### Detection Timing
 
 - `PostToolUse`
 - `PreCompact`
-- transcript 中出现大 payload / replacement / summary 后
+- After a large payload / replacement / summary appears in the transcript
 
-### 缺陷信号
+### Defect Signals
 
-- 大段内容被引入后 3 到 5 步内无消费
-- 摘要与原文共存过久
-- base64 / 大 JSON / 长日志未被结构化提炼
-- 大段代码读入后没有继续触达相关符号或相关文件
+- A large block of content is introduced and then not consumed within the following 3 to 5 steps
+- The summary and the source text coexist for too long
+- base64 / large JSON / long logs that have not been distilled into a structured form
+- A large block of code is read in, but no related symbols or related files are touched thereafter
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 提示“当前大内容尚未被消费，建议先摘要再继续”
-- `guard`：
-  - 在下次读大文件前提示“先使用 Grep / symbol search 缩小范围”
-- `remediate`：
-  - 自动注入一条修正建议：
-    - “请先总结上一段载荷的有效结论，仅保留与目标文件/符号直接相关的信息”
+- `warn`:
+  - Hint that "the current large block of content has not yet been consumed; consider summarizing before continuing"
+- `guard`:
+  - Before the next read of a large file, hint that one should "first use Grep / symbol search to narrow the scope"
+- `remediate`:
+  - Automatically inject a corrective suggestion:
+    - "Please first summarize the effective conclusions of the preceding payload, and retain only the information that is directly relevant to the target file/symbol"
 
-### 规避目标
+### Avoidance Objective
 
-- 减少无效大上下文滞留
-- 降低后续 compact 的质量损失
+- Reduce the retention of ineffective large context
+- Reduce the quality loss of the subsequent compact
 
 ## 6.2 Oversized Rules
 
-### 检测时机
+### Detection Timing
 
 - `SessionStart`
-- 首轮 assistant 输出前
+- Before the first round of assistant output
 - `PreCompact`
 
-### 缺陷信号
+### Defect Signals
 
-- system / appended rules 绝对体积过大
-- 规则占当前上下文比重过高
-- 规则已经成为最大静态块
+- The absolute volume of the system / appended rules is too large
+- The rules account for too large a share of the current context
+- The rules have already become the largest static block
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 报告规则 token 占比
-- `guard`：
-  - 提示切换为“最小规则 + 外部文档引用”
-- `remediate`：
-  - 自动生成压缩版 rule 摘要文件
-  - 将长规则转为引用提示，而非重复注入全文
+- `warn`:
+  - Report the token share of the rules
+- `guard`:
+  - Hint that one should switch to "minimal rules + external document references"
+- `remediate`:
+  - Automatically generate a compressed rule summary file
+  - Turn long rules into reference hints, rather than repeatedly injecting the full text
 
-### 规避目标
+### Avoidance Objective
 
-- 避免规则挤占执行态上下文
+- Prevent the rules from crowding out the execution-time context
 
 ## 6.3 Context Thrashing
 
-### 检测时机
+### Detection Timing
 
-- `PreToolUse` 读大文件前
+- `PreToolUse`, before a large file is read
 - `PreCompact`
-- transcript 发现短期内大量读入后又压缩
+- The transcript reveals a large volume of reading followed by compaction within a short period
 
-### 缺陷信号
+### Defect Signals
 
-- 窗口已接近阈值还继续读大对象
-- 1 到 2 步后就发生 compact / replacement
-- 压缩前引入的信息没有继续用到
+- Large objects continue to be read even though the window is already close to the threshold
+- A compact / replacement occurs after only 1 to 2 steps
+- The information introduced before compaction is not used thereafter
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 报告“即将读入的大对象很可能马上被压缩”
-- `guard`：
-  - 拦截 `Read` / `Glob` / 大日志读取，要求先缩小范围
-- `remediate`：
-  - 自动建议替代策略：
-    - 先 Grep / symbol search
-    - 只读命中段
-    - 先摘要上文，再扩展新对象
+- `warn`:
+  - Report that "the large object about to be read in will very likely be compacted straight away"
+- `guard`:
+  - Intercept `Read` / `Glob` / large log reads and require that the scope be narrowed first
+- `remediate`:
+  - Automatically suggest alternative strategies:
+    - Use Grep / symbol search first
+    - Read only the matching segments
+    - Summarize the preceding context first, then expand with the new object
 
-### 规避目标
+### Avoidance Objective
 
-- 避免“读了就丢”
+- Avoid "reading and then discarding"
 
 ## 6.4 Tool Call Chain
 
-### 检测时机
+### Detection Timing
 
-- 每次 `PostToolUse`
+- Every `PostToolUse`
 
-### 缺陷信号
+### Defect Signals
 
-- 同工具连续调用过长
-- 出现 A->B->A / A->B->A->B 循环
-- 输入差异很小，且没有代码邻域推进
+- Consecutive invocations of the same tool run on too long
+- A->B->A / A->B->A->B cycles appear
+- The differences between the inputs are very small, and there is no progress in the code neighborhood
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 提示“连续工具链过长，建议合并批处理”
-- `guard`：
-  - 当达到错误阈值时阻断下一次同类工具调用
-- `remediate`：
-  - 生成替代计划：
-    - 批量 grep 后集中 read
-    - 先定位目标符号再操作
-    - 从搜索转为验证
+- `warn`:
+  - Hint that "the consecutive tool chain is too long; consider merging it into batch processing"
+- `guard`:
+  - Block the next invocation of a tool of the same kind once the error threshold is reached
+- `remediate`:
+  - Generate an alternative plan:
+    - Perform a batch grep first, then read in a consolidated manner
+    - Locate the target symbol first, then operate on it
+    - Move from searching to verifying
 
-### 规避目标
+### Avoidance Objective
 
-- 避免低效空转链
+- Avoid inefficient spinning chains
 
 ## 6.5 Dead Step
 
-### 检测时机
+### Detection Timing
 
-- 某次工具成功返回后，向后观察 3 到 5 步
+- After a given tool returns successfully, look ahead over the following 3 to 5 steps
 
-### 缺陷信号
+### Defect Signals
 
-- 工具结果未被后续输入引用
-- 未进入后续计划文本
-- 未引起文件/符号/related-files 邻域动作
-- 未产生分支变化
-- `Write` 永不判为 dead step
+- The tool result is not referenced by any subsequent input
+- It does not enter the subsequent plan text
+- It gives rise to no action in the file/symbol/related-files neighborhood
+- It produces no branch change
+- `Write` is never judged to be a dead step
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 对刚完成但尚未消费的结果打标
-- `guard`：
-  - 在连续出现 dead step 候选时，阻止继续同类盲读
-- `remediate`：
-  - 自动提示：
-    - “请先说明上一工具结果对当前问题的影响，再决定下一步”
+- `warn`:
+  - Tag those results that have just been completed but have not yet been consumed
+- `guard`:
+  - When dead step candidates occur consecutively, prevent further blind reads of the same kind
+- `remediate`:
+  - Automatic hint:
+    - "Please first explain the bearing of the preceding tool result on the current problem, and only then decide on the next step"
 
-### 规避目标
+### Avoidance Objective
 
-- 强制每个读取 / 搜索结果进入后续决策链
+- Force every read / search result into the subsequent decision chain
 
 ## 6.6 Duplicate Step
 
-### 检测时机
+### Detection Timing
 
-- 新工具调用前比对最近同类步骤
+- Before a new tool invocation, compare it against the most recent steps of the same kind
 
-### 缺陷信号
+### Defect Signals
 
-- 输入高度相似
-- 中间没有相关文件变更
-- 输出摘要高度相似
-- 命中同一 AST 符号集合
+- The inputs are highly similar
+- No relevant file changed in between
+- The output summaries are highly similar
+- The same AST symbol set is hit
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 标记为“重复操作候选”
-- `guard`：
-  - 二次重复时要求解释重复原因
-- `remediate`：
-  - 自动给出更优动作：
-    - 使用缓存结果
-    - 直接进入修改 / 验证
-    - 扩大目标范围而不是重复读同一点
+- `warn`:
+  - Mark it as a "duplicate operation candidate"
+- `guard`:
+  - On the second repetition, require an explanation of the reason for repeating
+- `remediate`:
+  - Automatically put forward a better action:
+    - Use the cached result
+    - Proceed directly to modification / verification
+    - Broaden the target scope rather than repeatedly reading the same point
 
-### 规避目标
+### Avoidance Objective
 
-- 降低重复读取、重复搜索、重复执行
+- Reduce repeated reading, repeated searching, and repeated execution
 
 ## 6.7 Wrapper Workflow
 
-### 检测时机
+### Detection Timing
 
-- subagent / agent 工具完成后
+- After a subagent / agent tool completes
 - `SubagentStop`
 
-### 缺陷信号
+### Defect Signals
 
-- agent 只做简单透传
-- 下游工具类型单一
-- 输入输出高度相似
-- 没有变换、验证、聚合
-- 低符号增量
+- The agent merely performs a simple pass-through
+- The downstream tool type is homogeneous
+- The input and the output are highly similar
+- There is no transformation, verification, or aggregation
+- A low symbol increment
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 报告“当前 agent 更像包装层”
-- `guard`：
-  - 限制继续为该模式派生新 subagent
-- `remediate`：
-  - 提示把简单包装逻辑折叠回主线程
-  - 或要求 agent 负责明确子任务边界与验证标准
+- `warn`:
+  - Report that "the current agent looks more like a wrapper layer"
+- `guard`:
+  - Restrict the further derivation of new subagents for this pattern
+- `remediate`:
+  - Hint that the simple wrapping logic should be folded back into the main thread
+  - Or require the agent to take responsibility for clear subtask boundaries and verification criteria
 
-### 规避目标
+### Avoidance Objective
 
-- 避免空壳 agent 增加调用层级
+- Avoid hollow agents that merely add layers of invocation
 
 ## 6.8 Context Coupling
 
-### 检测时机
+### Detection Timing
 
-- 每轮消息后更新调用图
+- Update the call graph after each round of messages
 - `SubagentStop`
 
-### 缺陷信号
+### Defect Signals
 
-- 主线程和多个 subagent 在同一代码邻域高频来回切换
-- 调用图出现强 SCC
-- 回边频繁
-- 上下文在多个 worker 间来回搬运
+- The main thread and multiple subagents switch back and forth frequently within the same code neighborhood
+- A strong SCC appears in the call graph
+- Back edges are frequent
+- Context is shuttled back and forth among multiple workers
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 提示“当前任务簇耦合过高，建议拆分边界”
-- `guard`：
-  - 在新建 subagent 前评估是否与现有 worker 写集冲突
-- `remediate`：
-  - 自动建议：
-    - 以文件簇拆分
-    - 以符号所有权拆分
-    - 先完成局部闭环再切换线程
+- `warn`:
+  - Hint that "the current task cluster is too tightly coupled; consider splitting its boundaries"
+- `guard`:
+  - Before creating a new subagent, assess whether it conflicts with the write set of an existing worker
+- `remediate`:
+  - Automatic suggestions:
+    - Split by file cluster
+    - Split by symbol ownership
+    - Complete a local closed loop before switching threads
 
-### 规避目标
+### Avoidance Objective
 
-- 控制主线程与分支线程的上下文回流
+- Control the context backflow between the main thread and the branch threads
 
 ## 6.9 Long Chain
 
-### 检测时机
+### Detection Timing
 
-- 每轮结束后评估当前任务链长度
+- Assess the length of the current task chain at the end of each round
 
-### 缺陷信号
+### Defect Signals
 
-- 步数过长
-- 没有显式 checkpoint
-- 没有显式子任务闭环
-- 同一问题跨过多文件簇来回游走
+- Too many steps
+- No explicit checkpoint
+- No explicit subtask closed loop
+- Wandering back and forth across too many file clusters for one and the same problem
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 提醒建立 checkpoint
-- `guard`：
-  - 到达阈值时要求先总结，再继续
-- `remediate`：
-  - 自动注入：
-    - 当前已完成项
-    - 未完成项
-    - 下一步只允许聚焦一个子问题
+- `warn`:
+  - Remind the model to establish a checkpoint
+- `guard`:
+  - Once the threshold is reached, require a summary before continuing
+- `remediate`:
+  - Automatically inject:
+    - The items completed so far
+    - The items not yet completed
+    - The constraint that the next step may focus on one sub-problem only
 
-### 规避目标
+### Avoidance Objective
 
-- 防止无界探索链
+- Prevent unbounded exploration chains
 
 ## 6.10 Inconsistent Tool Interface
 
-### 检测时机
+### Detection Timing
 
 - `SessionStart`
-- 首次工具注册完成后
-- 新工具第一次被调用时
+- After the initial tool registration completes
+- When a new tool is invoked for the first time
 
-### 缺陷信号
+### Defect Signals
 
-- 语义相近工具接口不一致
-- 参数命名、结果形态差异过大
-- 同类读写工具返回结构不统一
+- Semantically similar tools have inconsistent interfaces
+- The parameter naming and the result shapes differ too widely
+- Read/write tools of the same kind return non-uniform structures
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 输出接口风险摘要
-- `guard`：
-  - 在高风险工具切换时要求显式参数映射
-- `remediate`：
-  - 生成 canonical adapter 层：
-    - 统一 path 字段
-    - 统一 result schema
-    - 统一 success/error envelope
+- `warn`:
+  - Emit an interface risk summary
+- `guard`:
+  - Require an explicit parameter mapping when switching between high-risk tools
+- `remediate`:
+  - Generate a canonical adapter layer:
+    - Unify the path field
+    - Unify the result schema
+    - Unify the success/error envelope
 
-### 规避目标
+### Avoidance Objective
 
-- 降低模型因工具接口不一致产生的误用
+- Reduce the misuse that arises when the model faces inconsistent tool interfaces
 
 ## 6.11 Weak Tool
 
-### 检测时机
+### Detection Timing
 
 - `SessionStart`
-- 每轮任务簇切换后
+- After each switch of the task cluster
 
-### 缺陷信号
+### Defect Signals
 
-- 明明存在更适用工具却长期不用
-- 读大文件替代搜索工具
-- 手工遍历替代 AST / grep / structured tool
+- A more applicable tool plainly exists, yet goes unused over a long period
+- Reading large files in place of using the search tools
+- Manual traversal in place of AST / grep / structured tools
 
-### 过程内动作
+### In-Process Actions
 
-- `warn`：
-  - 提示“存在更强工具候选”
-- `guard`：
-  - 在低效替代模式持续出现时阻止继续弱工具路径
-- `remediate`：
-  - 自动建议最适合的替代工具
-  - 给出调用模板
+- `warn`:
+  - Hint that "a stronger candidate tool exists"
+- `guard`:
+  - When the inefficient substitution pattern keeps recurring, block any further weak tool path
+- `remediate`:
+  - Automatically suggest the most suitable alternative tool
+  - Provide an invocation template
 
-### 规避目标
+### Avoidance Objective
 
-- 把工具选择从“能用”提升到“适配度更高”
+- Raise tool selection from "usable" to "a better fit"
 
-## 7. 配置文件设计
+## 7. Configuration File Design
 
-核心要求：
+Core requirements:
 
-- 全局模式统一控制
-- 11 项基准可单独开关
-- 每项都可配置阈值、动作等级、冷却窗口
+- Uniform control by a global mode
+- Each of the 11 benchmarks can be toggled individually
+- Every one of them can be configured with thresholds, an action level, and a cooldown window
 
-建议配置项：
+Recommended configuration items:
 
 - `enabled`
 - `mode`
@@ -504,18 +504,18 @@ Claude Code CLI
 - `injectPrompt`
 - `blockOnError`
 
-具体模板见：
+For the concrete template, see:
 
 - [tools/claude-code-runtime-guard/guard.config.example.json](./tools/claude-code-runtime-guard/guard.config.example.json)
 
-## 8. 一键嵌入方式
+## 8. One-Click Embedding
 
-当前仓库里已经提供可直接使用的接入脚本：
+The current repository already provides integration scripts that can be used directly:
 
 - [bin/claude-with-guard](./tools/claude-code-runtime-guard/bin/claude-with-guard)
 - [bin/cc-guard-hook](./tools/claude-code-runtime-guard/bin/cc-guard-hook)
 
-推荐先安装 hooks：
+It is recommended to install the hooks first:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/claude-with-guard \
@@ -523,37 +523,37 @@ Claude Code CLI
   --install-only
 ```
 
-这会把 hooks 合并写入当前项目的 `.claude/settings.local.json`，并把传入的 guard 配置文件同步复制到当前项目的 `.claude/` 目录中。后续 hook 会优先读取项目内这份配置副本，避免并发项目共享同一个配置文件。
+This merges the hooks into the current project's `.claude/settings.local.json`, and also copies the guard configuration file that was passed in into the current project's `.claude/` directory. Subsequent hooks will read this in-project copy of the configuration with priority, which prevents concurrent projects from sharing one and the same configuration file.
 
-之后直接用：
+Thereafter, simply use:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/claude-with-guard \
   --config ./tools/claude-code-runtime-guard/guard.config.example.json
 ```
 
-执行流程：
+Execution flow:
 
-1. wrapper 复制 guard 配置到目标项目 `.claude/` 目录，并合并写入 Claude hooks 配置
-2. Claude Code CLI 正常启动
-3. Claude 在 `SessionStart` / `PreToolUse` / `PostToolUse` / `PreCompact` 等事件触发 hook
-4. hook 把 payload 传给 `cc-guard-hook`
-5. `cc-guard-hook` 调用 runtime guard engine
-6. engine 读取 transcript 并运行 11 个基准
-7. hook 返回：
+1. The wrapper copies the guard configuration into the target project's `.claude/` directory, and merges the Claude hooks configuration into place
+2. The Claude Code CLI starts up as usual
+3. Claude triggers the hooks on events such as `SessionStart` / `PreToolUse` / `PostToolUse` / `PreCompact`
+4. The hook passes the payload to `cc-guard-hook`
+5. `cc-guard-hook` invokes the runtime guard engine
+6. The engine reads the transcript and runs the 11 benchmarks
+7. The hook returns:
    - `systemMessage`
    - `hookSpecificOutput.additionalContext`
-   - `permissionDecision=deny`（高风险 PreToolUse）
+   - `permissionDecision=deny` (for a high-risk `PreToolUse`)
 
-## 9. 最小可行实现顺序
+## 9. Minimum Viable Implementation Order
 
-建议分三期：
+A three-phase plan is recommended:
 
 ### Phase 1
 
 - transcript tailing
 - SessionStart / PreToolUse / PostToolUse / PreCompact hooks
-- 先落地 5 项高收益基准：
+- Land the 5 highest-return benchmarks first:
   - Ghost Context
   - Context Thrashing
   - Tool Call Chain
@@ -562,36 +562,36 @@ Claude Code CLI
 
 ### Phase 2
 
-- subagent 关系
+- subagent relations
 - Context Coupling
 - Wrapper Workflow
 - Long Chain
 
 ### Phase 3
 
-- 工具接口建模
+- Tool interface modeling
 - Inconsistent Tool Interface
 - Weak Tool
-- 自动 remediation 注入
+- Automatic remediation injection
 
-## 10. 推荐输出
+## 10. Recommended Outputs
 
-sidecar 建议输出三类产物：
+It is recommended that the sidecar emit three kinds of artifact:
 
 - `alerts/<session_id>.jsonl`
-  - 逐条告警
+  - The individual warnings
 - `state/<session_id>.json`
-  - 当前守护状态
+  - The current guard state
 - `remediation/<session_id>.md`
-  - 可注入的修正建议
+  - The corrective suggestions that can be injected
 
-## 11. 结论
+## 11. Conclusion
 
-对 Claude Code CLI，最稳妥的落地方式不是改内部源码，而是：
+For the Claude Code CLI, the most robust way to land this is not to modify the internal source code, but rather to:
 
-- 用 hooks 拿“当前时刻”
-- 用 transcript tailing 拿“全局历史”
-- 用 AST + related files 补“代码语义邻域”
-- 用 11 个基准驱动实时告警与轻量干预
+- Use the hooks to obtain "the present moment"
+- Use transcript tailing to obtain "the global history"
+- Use the AST + related files to supplement "the code semantic neighborhood"
+- Use the 11 benchmarks to drive real-time warnings and lightweight intervention
 
-这样得到的是一个真正独立、可一键接入、可逐项开关、可持续演进的运行时缺陷防护组件。
+What this yields is a runtime defect protection component that is genuinely independent, embeddable with one click, toggleable item by item, and able to evolve continuously.

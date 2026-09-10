@@ -2,21 +2,22 @@ import { AnnotatedCase } from '../adapters/AnnotationLoader';
 import { Rng, createSeededRng } from './Stats';
 
 /**
- * 标注集的分层划分（论文附录 B.4）。
+ * Stratified split of the annotation set (Appendix B.4 of the paper).
  *
- * 200 条标注样本划分为 80 development / 40 calibration / 80 evaluation，
- * 按 benchmark 来源与端点任务成败双重分层，避免校准与最终评估被单一任务
- * 形态主导。
+ * The 200 annotated samples are split into 80 development / 40 calibration / 80 evaluation,
+ * stratified jointly by benchmark source and endpoint task success, so that calibration and
+ * final evaluation are not dominated by a single task shape.
  *
- * 阈值只在 development 上调优，后验风险映射只在 calibration 上拟合，
- * 最终指标只在 evaluation 上报告——这三条约束由 assertSplitDiscipline 检查。
+ * Thresholds are tuned only on development, the posterior risk mapping is fitted only on
+ * calibration, and final metrics are reported only on evaluation -- these three constraints are
+ * checked by assertSplitDiscipline.
  */
 
 export type SplitName = 'development' | 'calibration' | 'evaluation';
 
 export const SPLIT_NAMES: readonly SplitName[] = ['development', 'calibration', 'evaluation'];
 
-/** 论文使用的划分规模 */
+/** Split sizes used by the paper */
 export const PAPER_SPLIT_SIZES: Record<SplitName, number> = {
   development: 80,
   calibration: 40,
@@ -24,13 +25,13 @@ export const PAPER_SPLIT_SIZES: Record<SplitName, number> = {
 };
 
 export interface SplitOptions {
-  /** 各划分的目标样本数；默认使用论文的 80 / 40 / 80 */
+  /** Target sample count per split; defaults to the paper's 80 / 40 / 80 */
   sizes?: Partial<Record<SplitName, number>>;
-  /** 随机种子，保证划分可复现 */
+  /** Random seed, which keeps the split reproducible */
   seed?: number;
   /**
-   * 分层键的构造方式，默认为 `${benchmark}|${successBucket}`。
-   * successBucket 取 success / failure / unknown。
+   * How the stratum key is constructed; defaults to `${benchmark}|${successBucket}`.
+   * successBucket is one of success / failure / unknown.
    */
   stratumKey?: (annotatedCase: AnnotatedCase) => string;
 }
@@ -43,13 +44,13 @@ export interface SplitAssignment {
 
 export interface SplitResult {
   assignments: SplitAssignment[];
-  /** caseId -> split，便于快速查询 */
+  /** caseId -> split, for fast lookup */
   splitByCaseId: Record<string, SplitName>;
-  /** 各划分实际样本数 */
+  /** Actual sample count per split */
   counts: Record<SplitName, number>;
-  /** 各划分内的分层分布，用于核对分层是否均衡 */
+  /** Stratum distribution within each split, used to check that stratification is balanced */
   stratumCounts: Record<SplitName, Record<string, number>>;
-  /** 目标规模与实际规模不一致时的说明 */
+  /** Notes emitted when the target sizes and the actual sizes disagree */
   notes: string[];
 }
 
@@ -59,7 +60,7 @@ export function defaultStratumKey(annotatedCase: AnnotatedCase): string {
   return `${annotatedCase.benchmark}|${bucket}`;
 }
 
-/** Fisher-Yates 洗牌，使用可复现 rng */
+/** Fisher-Yates shuffle, using a reproducible rng */
 function shuffle<T>(values: T[], rng: Rng): T[] {
   const result = [...values];
   for (let index = result.length - 1; index > 0; index--) {
@@ -70,8 +71,8 @@ function shuffle<T>(values: T[], rng: Rng): T[] {
 }
 
 /**
- * 按最大余数法把一个分层内的样本按目标比例分配到三个划分。
- * 保证分配总数恰好等于该分层的样本数。
+ * Distribute the samples of one stratum across the three splits at the target ratios, using the
+ * largest-remainder method. Guarantees the allocated total exactly equals the stratum's size.
  */
 function allocateWithinStratum(
   stratumSize: number,
@@ -102,10 +103,11 @@ function allocateWithinStratum(
 }
 
 /**
- * 生成分层划分。
+ * Produce the stratified split.
  *
- * 当实际样本数不等于目标总数（例如标注集尚未标满 200 条）时，按目标比例
- * 等比缩放，并在 notes 中记录，避免静默产出规模不符的划分。
+ * When the actual sample count differs from the target total (for example, the annotation set has
+ * not yet reached 200 cases), the sizes are rescaled proportionally and a note is recorded, so
+ * that a split of the wrong size is never produced silently.
  */
 export function splitAnnotatedCases(
   cases: AnnotatedCase[],
@@ -153,7 +155,7 @@ export function splitAnnotatedCases(
     evaluation: {},
   } as Record<SplitName, Record<string, number>>;
 
-  // 分层键排序，确保与插入顺序无关，划分完全由种子决定
+  // Sort the stratum keys so the result is independent of insertion order and fully seed-determined
   for (const key of [...strata.keys()].sort()) {
     const bucket = shuffle(strata.get(key)!, rng);
     const allocation = allocateWithinStratum(bucket.length, ratios);
@@ -193,8 +195,8 @@ export interface SplitDisciplineViolation {
 }
 
 /**
- * 检查划分纪律：阈值调优只能用 development，后验映射只能用 calibration，
- * 最终指标只能用 evaluation。任何越界都会被报出来。
+ * Check split discipline: threshold tuning may only use development, the posterior mapping may
+ * only use calibration, and final metrics may only use evaluation. Any overreach is reported.
  */
 export function assertSplitDiscipline(
   splitByCaseId: Record<string, SplitName>,

@@ -155,10 +155,10 @@ async function main() {
     const issues = await new WeakToolDetector(createSession(), DEFAULT_EVALUATION_CONFIG).detect();
     const issue = issues.find((item) => item.metric === 'weakTool' && item.evidence?.details?.toolName === 'Agent');
     if (!issue) {
-      console.error('多文件相关修改场景下，应能识别 Agent 的弱工具机会，但未命中');
+      console.error('In a multi-file related-change scenario the Agent weak-tool opportunity should be identified, but it was not');
       process.exit(1);
     }
-    console.log('[ok] weaktool-ast-opportunity: 多文件相关修改可识别 Agent 的弱工具机会');
+    console.log('[ok] weaktool-ast-opportunity: multi-file related changes reveal the Agent weak-tool opportunity');
   } finally {
     restoreFile(projectAstPath, backupPath);
   }

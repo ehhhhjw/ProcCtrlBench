@@ -1,44 +1,44 @@
-# 如何验证当前实现
+# How to Verify the Current Implementation
 
-## 1. 编译
+## 1. Build
 
 ```bash
 npm install
 npm run build
 ```
 
-## 2. 运行示例
+## 2. Run the Example
 
 ```bash
 npm run example
 ```
 
-## 3. 检查报告
+## 3. Check the Report
 
-确认：
+Confirm that:
 
-- 没有 `totalScore`
-- 没有 `overallAssessment`
-- 没有维度 `score`
-- `summary.totalWarnings` 和 `summary.totalErrors` 存在
-- `taskOutcome.details` 存在
+- there is no `totalScore`
+- there is no `overallAssessment`
+- there is no dimension `score`
+- `summary.totalWarnings` and `summary.totalErrors` are present
+- `taskOutcome.details` is present
 
-## 4. 检查 `deadStep`
+## 4. Check `deadStep`
 
-准备包含 `Write` 的轨迹，确认不会因为 `Write` 而产生 `deadStep` issue。
+Prepare a trajectory containing `Write` and confirm that no `deadStep` issue is produced because of `Write`.
 
-## 5. 检查 Benchmark 汇总
+## 5. Check the Benchmark Summary
 
-如果有多份 JSON 报告：
+If you have multiple JSON reports:
 
 ```bash
 npx ts-node src/benchmark/BenchmarkRunner.ts ./output/evaluation-reports ./output/benchmark/summary.md
 ```
 
-确认输出的是：
+Confirm that the output contains:
 
-- 平均告警数
-- 平均错误数
-- 95% CI
+- the average number of warnings
+- the average number of errors
+- the 95% CI
 
-而不是平均分。
+rather than an average score.

@@ -86,8 +86,9 @@ interface WalkState {
 const MAX_TREE_SITTER_INPUT_CHARS = 120_000;
 
 /**
- * 基于 tree-sitter 的多语言符号抽取器。
- * 默认支持 TS/TSX/JS/Python/Java/C++/C#，粒度覆盖类、函数、方法、属性、变量、导入和调用点。
+ * Tree-sitter based multi-language symbol extractor.
+ * Supports TS/TSX/JS/Python/Java/C++/C# by default, at a granularity covering
+ * classes, functions, methods, properties, variables, imports and call sites.
  */
 export class AstAnalyzer {
   private parsers = new Map<SupportedLanguage, any>();
@@ -98,7 +99,8 @@ export class AstAnalyzer {
   }
 
   /**
-   * 兼容旧接口，同时返回更细粒度的符号结果。
+   * Backward-compatible with the legacy interface, while also returning
+   * finer-grained symbol results.
    */
   extractSymbols(code: string, options: AstExtractOptions = {}): ExtractedSymbols {
     this.ensureInitialized();
@@ -1078,10 +1080,13 @@ export class AstAnalyzer {
   }
 
   /**
-   * 正则回退路径。符号精度低于 tree-sitter，但语言标签仍然可知：
-   * 优先用文件后缀判定，其次用内容启发式。保留语言标签很重要——
-   * 项目级汇总（buildProjectSummary）按语言计数，若回退时一律记为 unknown，
-   * 会让整份报告看起来"识别不出任何语言"，掩盖了真实原因是解析器降级。
+   * Regex fallback path. Symbol precision is lower than tree-sitter, but the
+   * language label is still recoverable: prefer the file extension, then fall
+   * back to content heuristics. Preserving the language label matters --
+   * the project-level rollup (buildProjectSummary) counts by language, so
+   * recording every fallback as unknown would make the whole report look as if
+   * no language could be identified at all, hiding the real cause, which is
+   * that the parser was downgraded.
    */
   private extractWithRegexFallback(code: string, filePath?: string): ExtractedSymbols {
     const fromPath = this.detectLanguageFromPath(filePath);
@@ -1115,7 +1120,7 @@ export class AstAnalyzer {
       try {
         stat = fs.statSync(currentPath);
       } catch {
-        // 跳过无效的符号链接或不存在的文件
+        // Skip broken symlinks or files that do not exist
         return;
       }
       if (stat.isDirectory()) {

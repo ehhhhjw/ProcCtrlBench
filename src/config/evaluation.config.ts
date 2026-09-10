@@ -1,10 +1,10 @@
 import { EvaluationConfig } from '../types/evaluation.types';
 
 /**
- * 默认评估配置
+ * Default evaluation configuration
  */
 export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
-  // 阈值配置
+  // Threshold configuration
   thresholds: {
     ghostContext: {
       warningTokens: 512,
@@ -17,8 +17,8 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
       errorRatio: 0.35,
     },
     thrashing: {
-      windowThreshold: 0.75, // 75%的窗口占用（参考验证版文档，提前预警）
-      compressionLookAhead: 2, // 向后看2步
+      windowThreshold: 0.75, // 75% window occupancy (per the validated spec, prewarn early)
+      compressionLookAhead: 2, // Look ahead 2 steps
     },
     toolChain: {
       repetitiveWarningCount: 6,
@@ -33,7 +33,7 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
       simpleErrorLength: 40,
     },
   },
-  // 上下文窗口大小 (Claude 4.6 Opus的窗口大小)
+  // Context window size (the window size of Claude 4.6 Opus)
   contextWindowSize: 200000,
   riskModel: {
     warningThreshold: 0.55,

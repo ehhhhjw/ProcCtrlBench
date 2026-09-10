@@ -296,14 +296,14 @@ function buildExecutionContextSummary(sessionData: SessionData): ExecutionContex
     assistantMessages++;
     const content = extractMessageText(message.content).toLowerCase();
     if (
-      ['checkpoint', 'summary', 'progress', 'next step', 'plan', '阶段', '检查点', '总结', '进度'].some(
+      ['checkpoint', 'summary', 'progress', 'next step', 'plan'].some(
         (keyword) => content.includes(keyword)
       )
     ) {
       checkpointSignals++;
     }
     if (
-      ['handoff', 'need user', 'confirm', 'review', '人工', '确认', '接管', '选择', '决定'].some(
+      ['handoff', 'need user', 'confirm', 'review'].some(
         (keyword) => content.includes(keyword)
       )
     ) {

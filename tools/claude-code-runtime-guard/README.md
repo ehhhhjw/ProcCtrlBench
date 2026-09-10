@@ -1,47 +1,47 @@
 # Claude Code Runtime Guard
 
-这是面向 Claude Code CLI 的独立运行时守护组件。它不改 Claude Code 内部源码，而是通过 transcript `jsonl`、hooks 事件和当前仓库已有的 11 个基准 detector，在执行过程中输出缺陷告警、阻断意见和修正提示。
+This is a standalone runtime guard for the Claude Code CLI. It does not modify Claude Code's internal source code. Instead, it uses transcript `jsonl`, hook events, and the 11 benchmark detectors already in this repository to provide defect warnings, blocking recommendations, and remediation guidance during execution.
 
-当前目录提供：
+This directory provides:
 
-- 运行时代码：
+- Runtime code:
   - [src/index.ts](./tools/claude-code-runtime-guard/src/index.ts)
-- CLI 入口：
+- CLI entry point:
   - [src/cli.ts](./tools/claude-code-runtime-guard/src/cli.ts)
-- Hook bridge：
+- Hook bridge:
   - [src/hook-bridge.ts](./tools/claude-code-runtime-guard/src/hook-bridge.ts)
-- Settings 安装器：
+- Settings installer:
   - [src/settings-installer.ts](./tools/claude-code-runtime-guard/src/settings-installer.ts)
-- 一键包装脚本：
+- Wrapper scripts:
   - [bin/cc-guard](./tools/claude-code-runtime-guard/bin/cc-guard)
   - [bin/cc-guard-hook](./tools/claude-code-runtime-guard/bin/cc-guard-hook)
   - [bin/claude-with-guard](./tools/claude-code-runtime-guard/bin/claude-with-guard)
   - [bin/acoder-claude-with-guard](./tools/claude-code-runtime-guard/bin/acoder-claude-with-guard)
-- 配置模板：
+- Configuration template:
   - [guard.config.example.json](./tools/claude-code-runtime-guard/guard.config.example.json)
-- Claude settings 模板：
+- Claude settings template:
   - [examples/settings.local.json](./tools/claude-code-runtime-guard/examples/settings.local.json)
-- 方案文档：
+- Design document:
   - [docs/claude_code_runtime_guard.md](./docs/claude_code_runtime_guard.md)
 
-## 已实现能力
+## Implemented Features
 
-- 11 个基准全部支持运行时治理
-- 配置文件逐项开关
-- `jsonl` 全量重算 + 运行时冷却抑制
-- hook 模式
-- watcher 模式
-- prompt remediation 注入建议生成
+- Runtime governance for all 11 benchmarks
+- Per-item configuration toggles
+- Full `jsonl` recomputation with runtime cooldown suppression
+- hook mode
+- watcher mode
+- prompt remediation injection recommendation generation
 
-## 运行方式
+## Usage
 
-先构建：
+Build first:
 
 ```bash
 npm run build
 ```
 
-一次性分析：
+One-time analysis:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/cc-guard analyze \
@@ -49,14 +49,14 @@ npm run build
   --session ./ClaudeCodeStructure/tests/sample.jsonl
 ```
 
-hook 模式：
+hook mode:
 
 ```bash
 cat hook-payload.json | ./tools/claude-code-runtime-guard/bin/cc-guard hook \
   --config ./tools/claude-code-runtime-guard/guard.config.example.json
 ```
 
-watch 模式：
+watch mode:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/cc-guard watch \
@@ -64,7 +64,7 @@ watch 模式：
   --session ./ClaudeCodeStructure/tests/sample.jsonl
 ```
 
-一键把 hooks 安装到当前项目：
+Install hooks in the current project with one command:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/claude-with-guard \
@@ -72,16 +72,16 @@ watch 模式：
   --install-only
 ```
 
-安装时会把你传入的配置文件同步复制到目标项目的 `.claude/` 目录，并让 hook 优先使用项目内这份副本。这样不同项目可以并发运行且保持各自独立的 guard 配置。
+During installation, the provided configuration file is copied to the target project's `.claude/` directory, and the hook prioritizes this project-local copy. This allows multiple projects to run concurrently with independent guard configurations.
 
-安装后直接用 guard 包装 Claude：
+After installation, launch Claude through the guard wrapper:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/claude-with-guard \
   --config ./tools/claude-code-runtime-guard/guard.config.example.json
 ```
 
-如果你的 Claude Code 是通过 `acoder` 封装启动：
+If your Claude Code is launched through an `acoder` wrapper:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/acoder-claude-with-guard \
@@ -89,7 +89,7 @@ watch 模式：
   -- --continue
 ```
 
-或显式使用 launcher：
+Or explicitly specify the launcher:
 
 ```bash
 ./tools/claude-code-runtime-guard/bin/claude-with-guard \
@@ -98,7 +98,7 @@ watch 模式：
   -- --continue
 ```
 
-可选的 acoder 参数：
+Optional acoder arguments:
 
 - `--acoder-yolo`
 - `--acoder-model <name>`
@@ -106,15 +106,15 @@ watch 模式：
 - `--acoder-no-banner`
 - `--acoder-no-upgrade`
 
-说明：
+Notes:
 
-- `claude-with-guard` 会先把 hooks 合并写入当前项目的 `.claude/settings.local.json`
-- 同时会把 `--config` 指定的 guard 配置复制到当前项目的 `.claude/` 目录，再让 hook 指向这份项目内配置
-- 然后再启动 `claude`
-- hook 执行时会调用 `cc-guard-hook`
-- `cc-guard-hook` 会把 11 个基准的告警转换成 Claude Code 可识别的 hook 返回
+- `claude-with-guard` first merges the hooks into the current project's `.claude/settings.local.json`
+- It also copies the guard configuration specified by `--config` to the current project's `.claude/` directory, then points the hook to this project-local configuration
+- It then launches `claude`
+- The hook invokes `cc-guard-hook` during execution
+- `cc-guard-hook` converts warnings from the 11 benchmarks into hook responses recognized by Claude Code
 
-## 测试
+## Testing
 
 ```bash
 npm test

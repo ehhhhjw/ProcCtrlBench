@@ -20,7 +20,7 @@ const {
 } = require('../../dist/src/benchmark/PaperArtifacts.js');
 const { PROCCTRL_DEFECT_KEYS } = require('../../dist/src/benchmark/ProcCtrlScorecard.js');
 
-/** 构造一条最小可用的轨迹记录 */
+/** Build a minimal valid trajectory record. */
 function makeRecord(overrides = {}) {
   const record = {
     variant: 'system-a',
@@ -160,7 +160,7 @@ test('buildTable1 computes detection metrics once annotations line up', () => {
   assert.equal(deadStep.auroc, 1);
   assert.equal(deadStep.support, 2);
 
-  // 只标了 Tool-Use Efficiency 的一个缺陷，其他维度不应凭空出现
+  // Only one Tool-Use Efficiency defect is labeled, so other dimensions must not appear.
   const dimensions = table1.calibration.rows.map((row) => row.dimension);
   assert.ok(dimensions.includes('Tool-Use Efficiency'));
   assert.ok(!dimensions.includes('Context Management'));
@@ -198,7 +198,7 @@ test('buildTable3 marks task sources with no samples as null, not zero', () => {
 
 test('buildTable4 ranks with competition semantics and reports rank shift', () => {
   const records = [
-    // 系统 A：端点成功率更高但过程分更低
+    // System A has a higher endpoint success rate but a lower process score.
     makeRecord({ variant: 'A', success: true, qDef: 0.5, controlPreservation: 0.5, pb: 0.5 }),
     makeRecord({ variant: 'A', success: true, qDef: 0.5, controlPreservation: 0.5, pb: 0.5 }),
     makeRecord({ variant: 'B', success: true, qDef: 0.95, controlPreservation: 0.95, pb: 0.95 }),
@@ -214,7 +214,7 @@ test('buildTable4 ranks with competition semantics and reports rank shift', () =
   assert.equal(b.outcomeScore, 0.5);
   assert.equal(a.outcomeRank, 1);
   assert.equal(b.outcomeRank, 2);
-  // B 过程质量更好，因此 PB 排名领先，rankShift 为正
+  // B has better process quality, so it leads in PB rank and has a positive rankShift.
   assert.equal(b.pbRank, 1);
   assert.equal(b.rankShift, 1);
   assert.equal(a.rankShift, -1);
@@ -267,7 +267,7 @@ test('buildFig2a covers all 11 defects and reports conditional failure rates', (
   assert.equal(deadStep.failureRateWhenNotTriggered, 0);
   assert.equal(deadStep.group, 'Tool-Use Efficiency');
 
-  // Long Chain 按论文归入 Tool-Use Efficiency，而非 Workflow Architecture
+  // The paper assigns Long Chain to Tool-Use Efficiency, not Workflow Architecture.
   const longChain = fig2a.rows.find((row) => row.abbreviation === 'LongChain');
   assert.equal(longChain.group, 'Tool-Use Efficiency');
 });
@@ -287,7 +287,7 @@ test('buildFig6 emits a full 11x11 matrix with a unit diagonal', () => {
   assert.equal(diagonal.length, 11);
   assert.ok(diagonal.every((row) => row.correlation === 1));
 
-  // deadStep 与 longChain 同向单调，秩相关应为 1
+  // deadStep and longChain are monotonically aligned, so their rank correlation should be 1.
   const pair = fig6.rows.find((row) => row.rowDefect === 'DeadStep' && row.columnDefect === 'LongChain');
   assert.ok(Math.abs(pair.correlation - 1) < 1e-9);
 });
@@ -306,7 +306,7 @@ test('buildFig8 sweeps eta endpoints to pure Qdef and pure CP', () => {
   const etas = [...new Set(fig8.rows.map((row) => row.eta))].sort((a, b) => a - b);
   assert.deepEqual(etas, [0, 0.5, 1]);
 
-  // eta=0 时 PB 应等于 CP；eta=1 时应等于 Qdef
+  // At eta=0, PB should equal CP; at eta=1, it should equal Qdef.
   assert.ok(Math.abs(fig8.rows.find((row) => row.eta === 0).pb - 0.3) < 1e-9);
   assert.ok(Math.abs(fig8.rows.find((row) => row.eta === 1).pb - 0.9) < 1e-9);
 });
@@ -323,11 +323,11 @@ test('buildAllPaperArtifacts reports coverage and never silently drops an artifa
   assert.equal(bundle.annotationRowCount, 0);
   assert.deepEqual(bundle.benchmarks, ['android-bench', 'terminal-bench']);
 
-  // 14 项产出：Table 1 拆两块 + Table 2-7 + Figure 2a/3/5/6/7/8
+  // 14 artifacts: Table 1 split into two parts + Tables 2-7 + Figures 2a/3/5/6/7/8.
   assert.equal(bundle.artifacts.length, 14);
   assert.ok(bundle.artifacts.every((artifact) => artifact.id && artifact.paperRef));
 
-  // 每个 blocked 产出都必须给出原因，且行数为 0
+  // Every blocked artifact must provide a reason and have zero rows.
   for (const artifact of bundle.artifacts) {
     if (artifact.status === 'blocked') {
       assert.ok(artifact.reason, `${artifact.id} is blocked without a reason`);

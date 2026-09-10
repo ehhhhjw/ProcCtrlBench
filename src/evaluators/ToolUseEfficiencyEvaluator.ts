@@ -6,16 +6,16 @@ import { DuplicateStepDetector } from '../detectors/DuplicateStepDetector';
 import { DeadStepDetector } from '../detectors/DeadStepDetector';
 
 /**
- * 工具使用效率评估器
+ * Tool use efficiency evaluator
  */
 export class ToolUseEfficiencyEvaluator extends BaseEvaluator {
   readonly name = 'ToolUseEfficiencyEvaluator';
-  readonly description = '评估工具使用的效率，包括工具调用链、死步骤和重复步骤';
+  readonly description = 'Evaluates tool use efficiency, covering tool call chains, dead steps and duplicate steps';
 
   async evaluate(): Promise<EvaluationResult> {
     const allIssues: DetectionIssue[] = [];
 
-    // 运行各个检测器
+    // Run each detector
     const toolChainDetector = new ToolChainDetector(this.sessionData, this.config);
     const toolChainIssues = await toolChainDetector.detect();
     allIssues.push(...toolChainIssues);
@@ -28,10 +28,10 @@ export class ToolUseEfficiencyEvaluator extends BaseEvaluator {
     const deadStepIssues = await deadStepDetector.detect();
     allIssues.push(...deadStepIssues);
 
-    // 统计问题
+    // Count issues
     const issueStats = this.calculateIssueStats(allIssues);
 
-    // 构建详细信息
+    // Build the details payload
     const details = this.buildDetails(allIssues);
 
     return {
@@ -44,7 +44,7 @@ export class ToolUseEfficiencyEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 构建详细信息
+   * Builds the details payload
    */
   private buildDetails(issues: DetectionIssue[]): Record<string, any> {
     const toolChainIssues = issues.filter(i => i.metric === 'toolCallChain');

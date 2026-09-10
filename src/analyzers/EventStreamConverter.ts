@@ -3,8 +3,8 @@ import { EvaluationEvent, EventStreamAnalysisSummary } from '../types/evaluation
 import { ContextChainAnalyzer } from './ContextChainAnalyzer';
 
 /**
- * 事件流转换器
- * 将SessionData转换为标准化的评估事件流
+ * Event stream converter
+ * Converts SessionData into a normalized evaluation event stream
  */
 export class EventStreamConverter {
   private sessionData: SessionData;
@@ -18,17 +18,17 @@ export class EventStreamConverter {
   }
 
   /**
-   * 转换SessionData为事件流
+   * Converts SessionData into an event stream
    */
   convert(): EvaluationEvent[] {
     this.events = [];
     this.stepCounter = 0;
 
-    // 获取所有消息,按时间排序
+    // Collect all messages, sorted by time
     const messages = Array.from(this.sessionData.messages.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    // 转换每个消息为事件
+    // Convert each message into events
     for (const message of messages) {
       this.convertMessage(message);
     }
@@ -59,29 +59,29 @@ export class EventStreamConverter {
   }
 
   /**
-   * 转换单个消息为事件
+   * Converts a single message into events
    */
   private convertMessage(message: MessageNode): void {
     const runId = this.extractRunId();
 
-    // 确定actor
+    // Determine the actor
     const actor = this.determineActor(message);
     const actorName = message.agentId || message.type;
 
-    // 提取文件操作
+    // Extract file operations
     const { filesRead, filesWritten } = this.extractFileOperations(message);
 
-    // 计算上下文tokens
+    // Compute context tokens
     const { tokensBefore, tokensAfter } = this.calculateContextTokens(message);
 
-    // 如果是assistant消息,可能包含工具调用
+    // An assistant message may contain tool calls
     if (message.type === 'assistant' && message.toolUses.length > 0) {
-      // 为每个工具调用创建事件
+      // Create an event for each tool call
       for (const toolUse of message.toolUses) {
         this.convertToolUse(toolUse, message, runId, actor, actorName, tokensBefore, tokensAfter);
       }
     } else {
-      // 普通消息事件
+      // Plain message event
       const event: EvaluationEvent = {
         run_id: runId,
         step_id: this.stepCounter++,
@@ -107,7 +107,7 @@ export class EventStreamConverter {
   }
 
   /**
-   * 转换工具调用为事件
+   * Converts a tool call into events
    */
   private convertToolUse(
     toolUse: ToolUseInfo,
@@ -120,10 +120,10 @@ export class EventStreamConverter {
   ): void {
     const toolResult = this.sessionData.toolResults.get(toolUse.id);
 
-    // 提取文件操作
+    // Extract file operations
     const { filesRead, filesWritten } = this.extractFileOperationsFromTool(toolUse, toolResult);
 
-    // 工具调用事件
+    // Tool call event
     const toolCallEvent: EvaluationEvent = {
       run_id: runId,
       step_id: this.stepCounter++,
@@ -147,7 +147,7 @@ export class EventStreamConverter {
 
     this.events.push(toolCallEvent);
 
-    // 如果有工具结果,创建工具结果事件
+    // If a tool result exists, create a tool result event
     if (toolResult) {
       const resultEvent: EvaluationEvent = {
         run_id: runId,
@@ -175,7 +175,7 @@ export class EventStreamConverter {
   }
 
   /**
-   * 确定actor类型
+   * Determines the actor type
    */
   private determineActor(message: MessageNode): EvaluationEvent['actor'] {
     if (message.type === 'user') return 'user';
@@ -185,7 +185,7 @@ export class EventStreamConverter {
   }
 
   /**
-   * 提取文本内容
+   * Extracts text content
    */
   private extractTextContent(content: string | ContentBlock[] | undefined): string | undefined {
     if (!content) return undefined;
@@ -205,7 +205,7 @@ export class EventStreamConverter {
   }
 
   /**
-   * 从消息中提取文件操作
+   * Extracts file operations from a message
    */
   private extractFileOperations(message: MessageNode): {
     filesRead: string[];
@@ -226,7 +226,7 @@ export class EventStreamConverter {
   }
 
   /**
-   * 从工具调用中提取文件操作
+   * Extracts file operations from a tool call
    */
   private extractFileOperationsFromTool(
     toolUse: ToolUseInfo,
@@ -238,7 +238,7 @@ export class EventStreamConverter {
     const filesRead: string[] = [];
     const filesWritten: string[] = [];
 
-    // 根据工具类型提取文件路径
+    // Extract file paths according to the tool type
     const toolName = toolUse.name;
     const input = toolUse.input;
 
@@ -247,16 +247,16 @@ export class EventStreamConverter {
     } else if ((toolName === 'Write' || toolName === 'Edit') && input.file_path) {
       filesWritten.push(input.file_path);
     } else if (toolName === 'Glob' && toolResult && !toolResult.is_error) {
-      // Glob的结果包含文件列表,暂不提取
+      // Glob results contain a file list; not extracted for now
     } else if (toolName === 'Bash') {
-      // Bash命令可能涉及文件操作,但难以准确提取
+      // Bash commands may involve file operations, but they are hard to extract accurately
     }
 
     return { filesRead, filesWritten };
   }
 
   /**
-   * 计算消息前后的上下文tokens
+   * Computes the context tokens before and after a message
    */
   private calculateContextTokens(message: MessageNode): {
     tokensBefore: number;
@@ -266,21 +266,21 @@ export class EventStreamConverter {
   }
 
   /**
-   * 计算工具结果后的tokens
+   * Computes the token count after a tool result
    */
   private calculateTokensAfterResult(toolResult: any): number {
-    // 简化处理:估算工具结果的token数
+    // Simplified handling: estimate the token count of the tool result
     if (typeof toolResult.content === 'string') {
-      return Math.ceil(toolResult.content.length / 4); // 粗略估算
+      return Math.ceil(toolResult.content.length / 4); // Rough estimate
     }
     return 0;
   }
 
   /**
-   * 检查消息是否被压缩
+   * Checks whether a message was compressed
    */
   private isCompressed(message: MessageNode): boolean {
-    // 通过替换记录检测压缩
+    // Detect compression through the replacement records
     for (const replacement of this.sessionData.replacements.values()) {
       if (replacement.messageId === message.messageId) {
         return true;
@@ -290,7 +290,7 @@ export class EventStreamConverter {
   }
 
   /**
-   * 查找父步骤ID
+   * Finds the parent step ID
    */
   private findParentStepId(message: MessageNode): number | undefined {
     if (!message.parentUuid) return undefined;
@@ -300,11 +300,11 @@ export class EventStreamConverter {
   }
 
   /**
-   * 提取runId
+   * Extracts the runId
    */
   private extractRunId(): string {
-    // 从第一条消息的UUID中提取run ID
-    // 实际实现中可能需要从文件名或其他地方获取
+    // Extract the run ID from the UUID of the first message
+    // A real implementation may need to obtain it from the file name or elsewhere
     const firstMessage = Array.from(this.sessionData.messages.values())[0];
     return firstMessage ? firstMessage.uuid.substring(0, 8) : 'unknown';
   }

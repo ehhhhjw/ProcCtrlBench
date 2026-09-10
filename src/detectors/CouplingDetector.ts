@@ -8,8 +8,8 @@ import { writePrewarn } from '../utils/Prewarn';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 上下文耦合检测器
- * 检测Tools/skills/agents间存在交错依赖，非清晰层次结构
+ * Context coupling detector
+ * Detects interleaved dependencies among Tools/skills/agents instead of a clear hierarchical structure
  */
 export class CouplingDetector implements IDetector {
   readonly name = 'CouplingDetector';
@@ -37,31 +37,31 @@ export class CouplingDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 构建调用图
+    // Build the call graph
     const callGraph = this.buildCallGraph();
     const contextSequence = this.buildContextSequence();
     const contextGraph = this.buildContextGraph(contextSequence);
 
-    // 检测强连通分量 (Strongly Connected Components)
+    // Detect strongly connected components (Strongly Connected Components)
     const sccs = this.findStronglyConnectedComponents(callGraph);
     const contextSccs = this.findStronglyConnectedComponents(contextGraph);
 
     for (const scc of sccs) {
       if (scc.length >= 2) {
-        // 发现循环依赖
+        // Circular dependency found
         if (scc.length === 2) {
           writePrewarn({
             metric: 'contextCoupling',
-            message: `检测到小型SCC（可能的循环依赖）: ${scc.join(' ↔ ')}`,
+            message: `Detected a small SCC (possible circular dependency): ${scc.join(' ↔ ')}`,
             details: { components: scc },
           });
         }
         issues.push({
           metric: 'contextCoupling',
           severity: Severity.Warning,
-          message: `检测到上下文耦合: ${scc.length}个组件存在循环依赖 [${scc.join(' ↔ ')}]`,
+          message: `Detected context coupling: ${scc.length} components form a circular dependency [${scc.join(' ↔ ')}]`,
           location: {},
-          suggestion: `重构工作流，使其成为清晰的层次结构。考虑使用单向数据流，避免循环调用`,
+          suggestion: `Refactor the workflow into a clear hierarchical structure. Consider using unidirectional data flow to avoid circular invocations`,
           evidence: {
             type: 'medium',
             details: {
@@ -80,9 +80,9 @@ export class CouplingDetector implements IDetector {
         issues.push({
           metric: 'contextCoupling',
           severity: Severity.Warning,
-          message: `检测到代码上下文耦合: ${scc.length}个代码邻域反复互相依赖 [${scc.join(' ↔ ')}]`,
+          message: `Detected code context coupling: ${scc.length} code neighborhoods repeatedly depend on each other [${scc.join(' ↔ ')}]`,
           location: {},
-          suggestion: `代码相关步骤在多个模块簇之间来回切换。考虑按代码邻域分阶段执行，避免上下文反复抖动`,
+          suggestion: `Code-related steps switch back and forth among multiple module clusters. Consider executing in phases grouped by code neighborhood to avoid repeated context thrashing`,
           evidence: {
             type: 'medium',
             details: {
@@ -96,7 +96,7 @@ export class CouplingDetector implements IDetector {
       }
     }
 
-    // 检测交替调用模式
+    // Detect alternating invocation patterns
     const alternatingPatterns = this.detectAlternatingCalls(callGraph);
     const alternatingContexts = this.detectAlternatingContexts(contextSequence);
 
@@ -105,9 +105,9 @@ export class CouplingDetector implements IDetector {
         issues.push({
           metric: 'contextCoupling',
           severity: Severity.Warning,
-          message: `检测到交替调用模式: ${pattern.pattern.join(' ⟷ ')} 重复 ${pattern.count} 次`,
+          message: `Detected alternating invocation pattern: ${pattern.pattern.join(' ⟷ ')} repeated ${pattern.count} times`,
           location: {},
-          suggestion: `避免A→B→A→B这样的交替调用。考虑合并逻辑或重新设计接口`,
+          suggestion: `Avoid alternating invocations such as A→B→A→B. Consider merging the logic or redesigning the interface`,
           evidence: {
             type: 'medium',
             details: {
@@ -126,9 +126,9 @@ export class CouplingDetector implements IDetector {
         issues.push({
           metric: 'contextCoupling',
           severity: Severity.Warning,
-          message: `检测到代码上下文交替: ${pattern.pattern.join(' ⟷ ')} 重复 ${pattern.count} 次`,
+          message: `Detected code context alternation: ${pattern.pattern.join(' ⟷ ')} repeated ${pattern.count} times`,
           location: {},
-          suggestion: `当前流程在多个代码邻域间来回跳转。建议合并同一模块簇内的操作后再切换上下文`,
+          suggestion: `The current flow jumps back and forth among multiple code neighborhoods. Merge operations within the same module cluster before switching context`,
           evidence: {
             type: 'medium',
             details: {
@@ -143,7 +143,7 @@ export class CouplingDetector implements IDetector {
       }
     }
 
-    // 检测back-edge (表示非DAG结构)
+    // Detect back-edges (indicating a non-DAG structure)
     const backEdges = this.findBackEdges(callGraph);
     const contextBackEdges = this.findBackEdges(contextGraph);
 
@@ -151,9 +151,9 @@ export class CouplingDetector implements IDetector {
       issues.push({
         metric: 'contextCoupling',
         severity: Severity.Warning,
-        message: `检测到${backEdges.length}个反向依赖边，工作流不是有向无环图(DAG)`,
+        message: `Detected ${backEdges.length} back dependency edges; the workflow is not a directed acyclic graph (DAG)`,
         location: {},
-        suggestion: `理想的工作流应该是DAG结构。重构以消除反向依赖`,
+        suggestion: `An ideal workflow should be a DAG structure. Refactor to eliminate back dependencies`,
         evidence: {
           type: 'medium',
           details: {
@@ -170,9 +170,9 @@ export class CouplingDetector implements IDetector {
       issues.push({
         metric: 'contextCoupling',
         severity: Severity.Warning,
-        message: `检测到${contextBackEdges.length}个代码上下文反向依赖边，执行流程在多个代码邻域间形成回流`,
+        message: `Detected ${contextBackEdges.length} code context back dependency edges; the execution flow circles back among multiple code neighborhoods`,
         location: {},
-        suggestion: `将同一代码邻域的工作聚合到一起，减少跨模块往返`,
+        suggestion: `Aggregate work belonging to the same code neighborhood to reduce cross-module round trips`,
         evidence: {
           type: 'medium',
           details: {
@@ -190,35 +190,35 @@ export class CouplingDetector implements IDetector {
   }
 
   /**
-   * 构建调用图
+   * Build the call graph
    */
   private buildCallGraph(): Map<string, Set<string>> {
     const graph = new Map<string, Set<string>>();
 
-    // 初始化节点
+    // Initialize nodes
     const allActors = new Set<string>();
-    allActors.add('main'); // 主流程
+    allActors.add('main'); // Main flow
 
-    // 添加所有agents
+    // Add all agents
     for (const agentId of this.sessionData.agents.keys()) {
       allActors.add(agentId);
     }
 
-    // 初始化邻接表
+    // Initialize the adjacency list
     for (const actor of allActors) {
       graph.set(actor, new Set());
     }
 
-    // 构建边
+    // Build edges
     const toolUses = Array.from(this.sessionData.toolUses.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
     for (const toolUse of toolUses) {
       const from = toolUse.agentId || 'main';
 
-      // 如果调用了Agent工具，建立边
+      // If the Agent tool was invoked, create an edge
       if (toolUse.name === 'Agent') {
-        const to = toolUse.id; // Agent的ID
+        const to = toolUse.id; // The Agent's ID
 
         if (graph.has(from)) {
           graph.get(from)!.add(to);
@@ -271,7 +271,7 @@ export class CouplingDetector implements IDetector {
   }
 
   /**
-   * 查找强连通分量 (Tarjan算法)
+   * Find strongly connected components (Tarjan's algorithm)
    */
   private findStronglyConnectedComponents(graph: Map<string, Set<string>>): string[][] {
     const sccs: string[][] = [];
@@ -323,7 +323,7 @@ export class CouplingDetector implements IDetector {
   }
 
   /**
-   * 检测交替调用模式
+   * Detect alternating invocation patterns
    */
   private detectAlternatingCalls(graph: Map<string, Set<string>>): Array<{
     pattern: string[];
@@ -331,16 +331,16 @@ export class CouplingDetector implements IDetector {
   }> {
     const patterns: Array<{ pattern: string[]; count: number }> = [];
 
-    // 获取按时间排序的工具调用
+    // Get tool invocations sorted by time
     const toolUses = Array.from(this.sessionData.toolUses.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
-    // 提取调用序列
+    // Extract the invocation sequence
     const callSequence = toolUses
       .filter(t => t.name === 'Agent')
       .map(t => t.agentId || 'main');
 
-    // 检测A-B-A-B模式
+    // Detect the A-B-A-B pattern
     for (let i = 0; i < callSequence.length - 3; i++) {
       const a = callSequence[i];
       const b = callSequence[i + 1];
@@ -361,7 +361,7 @@ export class CouplingDetector implements IDetector {
             pattern: [a, b],
             count,
           });
-          i = j - 1; // 跳过已检测的部分
+          i = j - 1; // Skip the portion already detected
         }
       }
     }
@@ -406,7 +406,7 @@ export class CouplingDetector implements IDetector {
   }
 
   /**
-   * 查找反向边
+   * Find back edges
    */
   private findBackEdges(graph: Map<string, Set<string>>): Array<{ from: string; to: string }> {
     const backEdges: Array<{ from: string; to: string }> = [];
@@ -422,7 +422,7 @@ export class CouplingDetector implements IDetector {
         if (!visited.get(w)) {
           dfs(w);
         } else if (recStack.get(w)) {
-          // 发现反向边
+          // Back edge found
           backEdges.push({ from: v, to: w });
         }
       }

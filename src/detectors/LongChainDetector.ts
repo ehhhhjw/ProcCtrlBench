@@ -18,8 +18,8 @@ interface CodeFocus {
 }
 
 /**
- * 长链检测器
- * 检测单一任务执行链过长,缺乏子任务拆分
+ * Long chain detector
+ * Detects a single task whose execution chain is too long and lacks subtask decomposition
  */
 export class LongChainDetector implements IDetector {
   readonly name = 'LongChainDetector';
@@ -45,13 +45,13 @@ export class LongChainDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 获取所有步骤
+    // Get all steps
     const messages = Array.from(this.sessionData.messages.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
     const totalSteps = messages.length;
 
-    // 识别子任务和检查点
+    // Identify subtasks and checkpoints
     const explicitSubtasks = this.identifySubtasks(messages);
     const structuralSubtasks = this.identifyStructuralSubtasks(messages);
     const subtasks = this.mergeIndices(explicitSubtasks, structuralSubtasks);
@@ -60,21 +60,21 @@ export class LongChainDetector implements IDetector {
     const structuralCheckpoints = this.identifyStructuralCheckpoints(messages);
     const checkpoints = this.mergeIndices(explicitCheckpoints, structuralCheckpoints);
 
-    // 计算有效链长度
+    // Calculate the effective chain length
     const effectiveLength = totalSteps / (1 + subtasks.length + checkpoints.length);
 
-    // 预警：接近简单阈值或有效链长度阈值
+    // Prewarn: near the simple threshold or the effective chain length threshold
     if (subtasks.length === 0 && totalSteps === this.config.thresholds.longChain.simpleWarningLength - 1) {
       writePrewarn({
         metric: 'longChain',
-        message: `执行链长度接近简单阈值: ${totalSteps}`,
+        message: `execution chain length near simple threshold: ${totalSteps}`,
         details: { totalSteps },
       });
     }
     if (effectiveLength >= this.config.thresholds.longChain.warningLength * 0.9 && effectiveLength < this.config.thresholds.longChain.warningLength) {
       writePrewarn({
         metric: 'longChain',
-        message: `有效链长度接近阈值: ${effectiveLength.toFixed(1)}`,
+        message: `effective chain length near threshold: ${effectiveLength.toFixed(1)}`,
         details: { effectiveLength, subtasks: subtasks.length, checkpoints: checkpoints.length },
       });
     }
@@ -86,7 +86,7 @@ export class LongChainDetector implements IDetector {
       effectiveLength,
     };
 
-    // 判定阈值
+    // Threshold determination
     if (effectiveLength > this.config.thresholds.longChain.errorLength) {
       issues.push(this.createIssue(Severity.Error, info, {
         explicitSubtasks: explicitSubtasks.length,
@@ -103,7 +103,7 @@ export class LongChainDetector implements IDetector {
       }));
     }
 
-    // 简单版本检查: 如果总步骤数很多但没有子任务
+    // Simple check: many total steps but no subtasks
     if (subtasks.length === 0) {
       if (totalSteps > this.config.thresholds.longChain.simpleErrorLength) {
         issues.push(this.createSimpleIssue(Severity.Error, totalSteps));
@@ -116,7 +116,7 @@ export class LongChainDetector implements IDetector {
   }
 
   /**
-   * 识别子任务
+   * Identify subtasks
    */
   private identifySubtasks(messages: any[]): number[] {
     const subtaskIndices: number[] = [];
@@ -124,12 +124,12 @@ export class LongChainDetector implements IDetector {
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
 
-      // 识别Agent调用(表示子任务)
+      // Identify Agent invocations (indicating a subtask)
       if (message.agentId && message.isSidechain) {
         subtaskIndices.push(i);
       }
 
-      // 识别工具调用中的Agent
+      // Identify Agent among the tool invocations
       for (const toolUse of message.toolUses || []) {
         if (toolUse.name === 'Agent') {
           subtaskIndices.push(i);
@@ -141,7 +141,7 @@ export class LongChainDetector implements IDetector {
   }
 
   /**
-   * 识别检查点
+   * Identify checkpoints
    */
   private identifyCheckpoints(messages: any[]): number[] {
     const checkpointIndices: number[] = [];
@@ -149,17 +149,17 @@ export class LongChainDetector implements IDetector {
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
 
-      // 识别用户消息(表示检查点)
+      // Identify user messages (indicating a checkpoint)
       if (message.type === 'user') {
         checkpointIndices.push(i);
       }
 
-      // 识别测试/验证步骤
+      // Identify test/validation steps
       for (const toolUse of message.toolUses || []) {
         if (toolUse.name === 'Bash') {
           const command = toolUse.input.command;
 
-          // 测试命令
+          // Test commands
           if (command.includes('test') || command.includes('pytest') || command.includes('jest')) {
             checkpointIndices.push(i);
           }
@@ -171,7 +171,7 @@ export class LongChainDetector implements IDetector {
   }
 
   /**
-   * 识别隐式子任务：基于 AST/文件关系判断代码关注点已切换到新的模块簇。
+   * Identify implicit subtasks: use AST/file relationships to determine that the code focus has shifted to a new module cluster.
    */
   private identifyStructuralSubtasks(messages: MessageNode[]): number[] {
     const focuses = this.buildCodeFocuses(messages);
@@ -200,7 +200,7 @@ export class LongChainDetector implements IDetector {
   }
 
   /**
-   * 识别隐式检查点：修改某个代码簇后，对同一簇进行验证/回读。
+   * Identify implicit checkpoints: after modifying a code cluster, the same cluster is validated or read back.
    */
   private identifyStructuralCheckpoints(messages: MessageNode[]): number[] {
     const focuses = this.buildCodeFocuses(messages);
@@ -228,7 +228,7 @@ export class LongChainDetector implements IDetector {
   }
 
   /**
-   * 创建问题
+   * Create an issue
    */
   private createIssue(severity: Severity, info: LongChainInfo, details: Record<string, number>): DetectionIssue {
     const deduction = severity === Severity.Error ? 2.5 : 1.0;
@@ -236,11 +236,11 @@ export class LongChainDetector implements IDetector {
     return {
       metric: 'longChain',
       severity,
-      message: `检测到过长执行链: 总步骤 ${info.totalSteps}, 有效链长度 ${info.effectiveLength.toFixed(1)} (子任务: ${info.subtaskCount}, 检查点: ${info.checkpointCount})`,
+      message: `Detected overly long execution chain: total steps ${info.totalSteps}, effective chain length ${info.effectiveLength.toFixed(1)} (subtasks: ${info.subtaskCount}, checkpoints: ${info.checkpointCount})`,
       location: {
         stepRange: [0, info.totalSteps - 1],
       },
-      suggestion: `建议将复杂任务拆分为多个子任务或设置中间检查点。可以使用Agent工具来创建子任务，或在关键步骤后添加验证`,
+      suggestion: `Consider splitting a complex task into multiple subtasks or setting intermediate checkpoints. You can use the Agent tool to create subtasks, or add validation after key steps`,
       evidence: {
         type: severity === Severity.Error ? 'strong' : 'medium',
         details: {
@@ -253,7 +253,7 @@ export class LongChainDetector implements IDetector {
   }
 
   /**
-   * 创建简单问题
+   * Create a simple issue
    */
   private createSimpleIssue(severity: Severity, totalSteps: number): DetectionIssue {
     const deduction = severity === Severity.Error ? 2.5 : 1.0;
@@ -261,11 +261,11 @@ export class LongChainDetector implements IDetector {
     return {
       metric: 'longChain',
       severity,
-      message: `检测到长执行链且无子任务拆分: 总步骤 ${totalSteps}, 未使用任何子任务`,
+      message: `Detected long execution chain without subtask decomposition: total steps ${totalSteps}, no subtasks used`,
       location: {
         stepRange: [0, totalSteps - 1],
       },
-      suggestion: `对于复杂任务，建议使用Agent工具创建子任务，将大任务分解为多个独立的小任务`,
+      suggestion: `For complex tasks, consider using the Agent tool to create subtasks and decompose a large task into multiple independent smaller tasks`,
       evidence: {
         type: severity === Severity.Error ? 'strong' : 'medium',
         details: {
@@ -410,7 +410,7 @@ export class LongChainDetector implements IDetector {
       return false;
     }
     const normalized = text.toLowerCase();
-    return ['plan', '步骤', '阶段', '接下来', '然后', 'first', 'next'].some((token) => normalized.includes(token));
+    return ['plan', 'first', 'next'].some((token) => normalized.includes(token));
   }
 
   private hasValidationCue(text: string): boolean {
@@ -418,7 +418,7 @@ export class LongChainDetector implements IDetector {
       return false;
     }
     const normalized = text.toLowerCase();
-    return ['验证', '检查', '确认', 'verify', 'check', 'test'].some((token) => normalized.includes(token));
+    return ['verify', 'check', 'test'].some((token) => normalized.includes(token));
   }
 
   private isValidationCommand(command: string): boolean {

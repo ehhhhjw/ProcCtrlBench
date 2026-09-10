@@ -10,17 +10,17 @@ import {
 import { DEFAULT_ETA, DEFAULT_FRAGILE_CP_THRESHOLD } from '../src/benchmark/ProcCtrlScorecard';
 
 /**
- * 生成 ProcCtrlBench 论文的表格与图表数据。
+ * Generate table and figure data for the ProcCtrlBench paper.
  *
- * 用法：
+ * Usage:
  *   npx ts-node scripts/generate-paper-artifacts.ts \
  *     --records output/run-a/trajectory-records.jsonl,output/run-b/trajectory-records.jsonl \
  *     --annotations path/to/annotations.json \
  *     --output output/paper-artifacts
  *
- * --records 可传多个 JSONL，每个文件里的 variant 字段作为 agent-model 系统标识。
- * --annotations 可选；缺失时依赖人工标注的产出会被明确标记为 blocked，而不是
- * 输出空表或占位数字。
+ * --records accepts multiple JSONL files; each file's variant field identifies the agent-model system.
+ * --annotations is optional; when omitted, outputs that depend on human annotations are explicitly
+ * marked blocked instead of emitting empty tables or placeholder values.
  */
 
 type Args = Record<string, string>;

@@ -1,15 +1,15 @@
-# 验证计划
+# Validation Plan
 
-## 目标
+## Goals
 
-验证当前实现与文档一致，尤其是：
+Verify that the current implementation is consistent with the documentation, in particular:
 
-- 非评分制
-- AST 增强
-- related files 接入
-- `Write` 不算 `deadStep`
+- the non-scoring model
+- AST enhancement
+- related files integration
+- `Write` does not count as a `deadStep`
 
-## 代码级检查点
+## Code-level Checkpoints
 
 - [src/types/evaluation.types.ts](./src/types/evaluation.types.ts)
 - [src/scoring/ScoreCalculator.ts](./src/scoring/ScoreCalculator.ts)
@@ -17,15 +17,15 @@
 - [src/detectors/DeadStepDetector.ts](./src/detectors/DeadStepDetector.ts)
 - [src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts)
 
-## 报告级检查点
+## Report-level Checkpoints
 
-- 顶层没有 `totalScore`
-- `summary` 中没有 `overallAssessment`
-- `dimensions.*` 中没有 `score`
-- `diagnostics` 不暴露 `deduction`
+- no `totalScore` at the top level
+- no `overallAssessment` in `summary`
+- no `score` in `dimensions.*`
+- `diagnostics` does not expose `deduction`
 
-## 行为级检查点
+## Behavior-level Checkpoints
 
-- 项目 AST 存在时，`DeadStep` / `DuplicateStep` / `LongChain` / `InterfaceConsistency` 行为会利用项目关系
-- 外部 related files 数据存在时，文件图谱应进入分析流程
-- `Write` 操作本身不应被判为 dead step
+- when a project AST is available, the `DeadStep` / `DuplicateStep` / `LongChain` / `InterfaceConsistency` behaviors make use of project relationships
+- when external related files data is available, the file graph should enter the analysis pipeline
+- a `Write` operation itself should not be judged a dead step

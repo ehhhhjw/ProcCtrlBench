@@ -6,34 +6,34 @@ import { WrapperDetector } from '../detectors/WrapperDetector';
 import { CouplingDetector } from '../detectors/CouplingDetector';
 
 /**
- * 工作流架构评估器
+ * Workflow architecture evaluator
  */
 export class WorkflowArchitectureEvaluator extends BaseEvaluator {
   readonly name = 'WorkflowArchitectureEvaluator';
-  readonly description = '评估工作流组织能力，包括包装工作流、上下文耦合和执行链长度';
+  readonly description = 'Evaluates workflow organization capability, covering wrapper workflows, context coupling and execution chain length';
 
   async evaluate(): Promise<EvaluationResult> {
     const allIssues: DetectionIssue[] = [];
 
-    // 运行长链检测器
+    // Run the long chain detector
     const longChainDetector = new LongChainDetector(this.sessionData, this.config);
     const longChainIssues = await longChainDetector.detect();
     allIssues.push(...longChainIssues);
 
-    // 运行包装检测器
+    // Run the wrapper detector
     const wrapperDetector = new WrapperDetector(this.sessionData, this.config);
     const wrapperIssues = await wrapperDetector.detect();
     allIssues.push(...wrapperIssues);
 
-    // 运行耦合检测器
+    // Run the coupling detector
     const couplingDetector = new CouplingDetector(this.sessionData, this.config);
     const couplingIssues = await couplingDetector.detect();
     allIssues.push(...couplingIssues);
 
-    // 统计问题
+    // Count issues
     const issueStats = this.calculateIssueStats(allIssues);
 
-    // 构建详细信息
+    // Build the details payload
     const details = this.buildDetails(allIssues);
 
     return {
@@ -46,7 +46,7 @@ export class WorkflowArchitectureEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 构建详细信息
+   * Builds the details payload
    */
   private buildDetails(issues: DetectionIssue[]): Record<string, any> {
     const wrapperIssues = issues.filter(i => i.metric === 'wrapperWorkflow');

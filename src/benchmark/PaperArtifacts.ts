@@ -27,24 +27,24 @@ import { ObservedTrajectoryRecord } from './ObservedBenchmarkExperiments';
 import { Rng, bootstrapCI, createSeededRng, rank } from './Stats';
 
 /**
- * 把轨迹记录与人工标注装配为论文的表格与图表数据。
+ * Assemble trajectory records and human annotations into paper table and figure data.
  *
- * 覆盖 Table 1-7 与 Figure 2a / 3 / 5 / 6 / 8；Figure 7 的可靠性曲线数据
- * 由 Table 1 的校准对比一并产出。
+ * Covers Tables 1-7 and Figures 2a / 3 / 5 / 6 / 8; the reliability curve data for
+ * Figure 7 is produced alongside the Table 1 calibration comparison.
  *
- * 关键约束：任何依赖人工标注的产出，在标注缺失时返回 blocked 状态并说明原因，
- * 绝不输出空表或占位数值。
+ * Key constraint: any output that depends on human annotations returns blocked with
+ * a reason when annotations are missing, never an empty table or placeholder values.
  */
 
 export type ArtifactStatus = 'generated' | 'blocked';
 
 export interface ArtifactOutcome<T> {
-  /** 产出标识，同时用作文件名前缀 */
+  /** Output identifier, also used as the filename prefix */
   id: string;
-  /** 对应论文中的表/图编号 */
+  /** Corresponding table or figure number in the paper */
   paperRef: string;
   status: ArtifactStatus;
-  /** blocked 时说明缺什么 */
+  /** Describes what is missing when blocked */
   reason?: string;
   rows: T[];
 }
@@ -57,16 +57,17 @@ function blocked<T>(id: string, paperRef: string, reason: string): ArtifactOutco
   return { id, paperRef, status: 'blocked', reason, rows: [] };
 }
 
-/** 系统标识：轨迹记录里用 variant 承载 agent-model 配置名 */
+/** System identifier: variant stores the agent-model configuration name in trajectory records */
 export function systemOf(record: ObservedTrajectoryRecord): string {
   return record.variant;
 }
 
 /**
- * 样本连接键。
+ * Sample join key.
  *
- * 优先使用原始轨迹路径（唯一且稳定）；缺失时退化为 benchmark/task/trial 组合。
- * 标注集与检测输出必须用同一规则生成键，否则无法对齐。
+ * Prefer the original trajectory path, which is unique and stable; fall back to the
+ * benchmark/task/trial combination when absent. Annotation sets and detection outputs
+ * must generate keys using the same rule or they cannot be aligned.
  */
 export function caseKeyOfRecord(record: ObservedTrajectoryRecord): string {
   if (record.rawPath) {
@@ -119,7 +120,7 @@ export function defectPosteriorRisk(
   return typeof value === 'number' ? value : 0;
 }
 
-/** 把轨迹记录转成记分卡聚合所需的输入 */
+/** Convert a trajectory record into the input required for scorecard aggregation */
 export function recordToScorecardInput(record: ObservedTrajectoryRecord): SystemScorecardInput {
   return {
     system: systemOf(record),
@@ -156,7 +157,7 @@ function groupBySystem(records: ObservedTrajectoryRecord[]): Map<string, Observe
 }
 
 // ---------------------------------------------------------------------------
-// Table 1：缺陷实例化性能 + 维度校准质量
+// Table 1: defect instantiation performance + dimension calibration quality
 // ---------------------------------------------------------------------------
 
 export interface Table1DetectionRow {
@@ -185,7 +186,7 @@ export interface Table1CalibrationRow {
 export interface Table1Result {
   detection: ArtifactOutcome<Table1DetectionRow>;
   calibration: ArtifactOutcome<Table1CalibrationRow>;
-  /** Figure 7 的可靠性曲线数据 */
+  /** Reliability curve data for Figure 7 */
   reliability: ArtifactOutcome<ReliabilityRow>;
 }
 
@@ -216,10 +217,11 @@ const DIMENSION_SYMBOL_LABELS: Record<ProcCtrlDimensionKey, string> = {
 };
 
 /**
- * 构建 Table 1 与 Figure 7。
+ * Build Table 1 and Figure 7.
  *
- * 需要人工标注提供 y_j。标注缺失时三个产出全部 blocked——这正是原实现
- * 标记为 "blocked" 的原因，此处保留该诚实边界，只是把它结构化。
+ * Human annotations must provide y_j. When annotations are missing, all three outputs
+ * are blocked. This preserves the original implementation's honest boundary while
+ * expressing it structurally.
  */
 export function buildTable1(
   records: ObservedTrajectoryRecord[],
@@ -343,7 +345,7 @@ export function buildTable1(
     }
   }
 
-  // 全体样本上的 Overall 行，对应 Table 1 最后一行
+  // Overall row across all samples, corresponding to the last row of Table 1
   const allSamples = [...samplesByDefect.values()].flat();
   const overall = compareCalibration(
     allSamples.map((sample) => ({
@@ -374,7 +376,7 @@ export function buildTable1(
 }
 
 // ---------------------------------------------------------------------------
-// Table 2 / Table 7：跨系统记分卡与控制保持分解
+// Table 2 / Table 7: cross-system scorecards and control-preservation breakdown
 // ---------------------------------------------------------------------------
 
 export interface Table2Row {
@@ -440,9 +442,9 @@ export interface Table7Row {
 }
 
 /**
- * Table 7：控制保持五子维度分解。
- * 列名使用论文用词（correctability / authorityHandoff），内部字段仍为
- * corrigibility / handoffAwareness，映射在 recordToScorecardInput 中完成。
+ * Table 7: breakdown of the five control-preservation subdimensions.
+ * Column names use the paper's terms (correctability / authorityHandoff), while the
+ * internal fields remain corrigibility / handoffAwareness and are mapped in recordToScorecardInput.
  */
 export function buildTable7(
   records: ObservedTrajectoryRecord[],
@@ -471,7 +473,7 @@ export function buildTable7(
 }
 
 // ---------------------------------------------------------------------------
-// Table 3：场景分数
+// Table 3: scenario scores
 // ---------------------------------------------------------------------------
 
 export interface Table3Row {
@@ -510,7 +512,7 @@ export function buildTable3(
     };
     for (const column of BENCHMARK_COLUMNS) {
       const value = scenario.byBenchmark[column.benchmark];
-      // null 表示该系统在此来源上没有样本，与"分数为 0"区分开
+      // null means this system has no samples from this source, distinct from a score of 0
       row[column.key] = typeof value === 'number' ? value : null;
     }
     rows.push(row);
@@ -521,7 +523,7 @@ export function buildTable3(
 }
 
 // ---------------------------------------------------------------------------
-// Table 4：outcome 排名 vs ProcCtrlBench 排名
+// Table 4: outcome ranking vs ProcCtrlBench ranking
 // ---------------------------------------------------------------------------
 
 export interface Table4Row {
@@ -530,15 +532,15 @@ export interface Table4Row {
   outcomeRank: number;
   pb: number;
   pbRank: number;
-  /** outcomeRank - pbRank，正值表示在 ProcCtrlBench 下排名更好 */
+  /** outcomeRank - pbRank; a positive value means a better ProcCtrlBench ranking */
   rankShift: number;
   fragileSuccessRate: number;
   observedOutcomeCount: number;
 }
 
 /**
- * 竞赛式排名：分数相同则并列，占用相同名次。
- * 论文 Table 4 中出现过并列名次，这里显式实现该语义。
+ * Competition ranking: equal scores tie and share the same rank.
+ * Table 4 contains tied ranks, so this implements that behavior explicitly.
  */
 function competitionRanks(scores: number[]): number[] {
   const ordered = scores
@@ -607,7 +609,7 @@ export function buildTable4(
 }
 
 // ---------------------------------------------------------------------------
-// Table 5：标注一致性
+// Table 5: annotation agreement
 // ---------------------------------------------------------------------------
 
 export interface Table5Row {
@@ -637,7 +639,7 @@ export function buildTable5(annotationRows: FlatAnnotationRow[]): ArtifactOutcom
     }
     const stats = computeAgreementStats(
       scoped.map((row) => ({
-        // 一致性在仲裁前计算：把三值判断折叠为"是否判定为缺陷存在"
+        // Compute agreement before adjudication by collapsing ternary judgments into defect presence
         annotatorA: row.annotatorA === 'present',
         annotatorB: row.annotatorB === 'present',
         exempt: row.exempt,
@@ -677,7 +679,7 @@ export function buildTable5(annotationRows: FlatAnnotationRow[]): ArtifactOutcom
 }
 
 // ---------------------------------------------------------------------------
-// Table 6 / Figure 5：bootstrap 稳定性
+// Table 6 / Figure 5: bootstrap stability
 // ---------------------------------------------------------------------------
 
 export interface Table6Row {
@@ -746,7 +748,7 @@ export interface Fig5Row {
   sampleCount: number;
 }
 
-/** Figure 5：各系统 PB / CP / 四维分数的 95% bootstrap 置信区间 */
+/** Figure 5: 95% bootstrap confidence intervals for each system's PB, CP, and four dimension scores */
 export function buildFig5(
   records: ObservedTrajectoryRecord[],
   options?: BootstrapOptions
@@ -800,7 +802,7 @@ export interface Fig2aRow {
   support: number;
 }
 
-/** Figure 2a：缺陷触发与端点失败的关联 */
+/** Figure 2a: association between defect triggers and endpoint failure */
 export function buildFig2a(records: ObservedTrajectoryRecord[]): ArtifactOutcome<Fig2aRow> {
   const withOutcome = records.filter((record) => record.success !== null);
   if (withOutcome.length === 0) {
@@ -847,13 +849,13 @@ export interface Fig3Row {
   defect: string;
   abbreviation: string;
   group: string;
-  /** 该缺陷维度上的过程质量分：1 - 平均后验风险 */
+  /** Process quality score for this defect dimension: 1 - mean posterior risk */
   benchmarkScore: number;
   triggerRate: number;
   sampleCount: number;
 }
 
-/** Figure 3：逐缺陷的系统画像热力图数据 */
+/** Figure 3: per-defect system profile heatmap data */
 export function buildFig3(records: ObservedTrajectoryRecord[]): ArtifactOutcome<Fig3Row> {
   if (records.length === 0) {
     return blocked('fig3-per-defect-profiles', 'Figure 3', 'No trajectory records were supplied.');
@@ -888,7 +890,7 @@ export interface Fig6Row {
   support: number;
 }
 
-/** Figure 6：缺陷后验风险的两两相关矩阵 */
+/** Figure 6: pairwise correlation matrix of defect posterior risks */
 export function buildFig6(records: ObservedTrajectoryRecord[]): ArtifactOutcome<Fig6Row> {
   if (records.length < 2) {
     return blocked(
@@ -926,7 +928,7 @@ export interface Fig8Row {
   rank: number;
 }
 
-/** Figure 8：PB 对 eta 的敏感性 */
+/** Figure 8: PB sensitivity to eta */
 export function buildFig8(
   records: ObservedTrajectoryRecord[],
   steps = 21
@@ -961,22 +963,22 @@ export function buildFig8(
 }
 
 // ---------------------------------------------------------------------------
-// 汇总
+// Summary
 // ---------------------------------------------------------------------------
 
-/** 任意产出的统一上界，便于汇总遍历与写盘 */
+/** Common upper bound for all outputs, enabling aggregate iteration and file writes */
 export type AnyArtifactOutcome = ArtifactOutcome<object>;
 
 export interface PaperArtifactBundle {
   artifacts: AnyArtifactOutcome[];
-  /** 参与计算的轨迹数与系统数 */
+  /** Number of trajectories and systems included in the calculation */
   recordCount: number;
   systemCount: number;
   annotationRowCount: number;
   benchmarks: string[];
 }
 
-/** 一次性构建全部论文产出 */
+/** Build all paper outputs at once */
 export function buildAllPaperArtifacts(
   records: ObservedTrajectoryRecord[],
   annotationRows: FlatAnnotationRow[],

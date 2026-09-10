@@ -35,28 +35,28 @@ async function main() {
   fs.mkdirSync(out, { recursive:true });
   if (fs.existsSync(prewarn)) fs.unlinkSync(prewarn);
 
-  // 构造一个接近窗口阈值的使用场景（默认窗口阈值=0.75，使用量达到0.74*W）
+  // Build a usage scenario near the window threshold (default window threshold = 0.75, usage reaches 0.74*W)
   const W = DEFAULT_EVALUATION_CONFIG.contextWindowSize;
   const near = Math.floor(W * 0.74);
   const s = sessionWithUsage([
     { uuid:'u1', tokens: near, timestamp: 1 },
-    { uuid:'u2', tokens: near + Math.floor(W*0.02), timestamp: 2 }, // 接近阈值
+    { uuid:'u2', tokens: near + Math.floor(W*0.02), timestamp: 2 }, // near threshold
   ]);
 
   const det = new ThrashingDetector(s, DEFAULT_EVALUATION_CONFIG);
   await det.detect();
 
   if (!fs.existsSync(prewarn)) {
-    console.error('未产生 Thrashing 接近阈值的预警');
+    console.error('No near-threshold prewarn produced for Thrashing');
     process.exit(1);
   }
   const arr = JSON.parse(fs.readFileSync(prewarn,'utf-8'));
-  const hit = arr.some((x:any)=> x.metric==='contextThrashing' && String(x.message||'').includes('接近阈值'));
+  const hit = arr.some((x:any)=> x.metric==='contextThrashing' && String(x.message||'').includes('near threshold'));
   if (!hit) {
-    console.error('未发现 Thrashing 接近阈值预警记录');
+    console.error('No near-threshold prewarn record found for Thrashing');
     process.exit(1);
   }
-  console.log('[ok] thrashing-prewarn: 接近窗口阈值预警生效');
+  console.log('[ok] thrashing-prewarn: near-window-threshold prewarn fired');
 }
 
 main().catch(e=>{ console.error(e); process.exit(1); });

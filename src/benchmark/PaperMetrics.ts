@@ -12,35 +12,35 @@ import {
 import { CalibrationBucket } from '../types/evaluation.types';
 
 /**
- * ProcCtrlBench 论文产出所需的评测指标。
+ * Evaluation metrics required by the ProcCtrlBench paper artifacts.
  *
- * 覆盖：
- * - Table 1 左块：逐缺陷 precision / recall / F1 / AP / AUROC
- * - Table 1 右块：维度级 ECE（hard 阈值 vs 校准后验）
- * - Table 5：标注一致性（raw agreement / Cohen's kappa / 豁免率 / 仲裁率）
- * - Table 6：bootstrap 排名稳定性
- * - Figure 6：缺陷间相关矩阵
- * - Figure 7：reliability diagram（复用 Stats.reliabilityDiagram）
+ * Coverage:
+ * - Table 1, left block: per-defect precision / recall / F1 / AP / AUROC
+ * - Table 1, right block: dimension-level ECE (hard threshold vs calibrated posterior)
+ * - Table 5: annotation agreement (raw agreement / Cohen's kappa / exemption rate / adjudication rate)
+ * - Table 6: bootstrap ranking stability
+ * - Figure 6: inter-defect correlation matrix
+ * - Figure 7: reliability diagram (reuses Stats.reliabilityDiagram)
  *
- * 本模块只做统计计算，不涉及 I/O，也不内置任何论文数值。
+ * This module performs statistical computation only; it does no I/O and embeds no paper numbers.
  */
 
-/** 单个样本的检测输出与人工标注的配对 */
+/** Pairing of the detection output and the human annotation for a single sample */
 export interface DetectionSample {
-  /** 人工标注：该缺陷是否真实存在 */
+  /** Human annotation: whether the defect is genuinely present */
   label: boolean;
-  /** 检测器连续证据分 s_j 或校准后验风险 p_j，用于 AP / AUROC */
+  /** The detector's continuous evidence score s_j or calibrated posterior risk p_j, used for AP / AUROC */
   score: number;
-  /** 二值触发结果 finding_j，用于 precision / recall / F1 */
+  /** Binary trigger result finding_j, used for precision / recall / F1 */
   triggered: boolean;
 }
 
 export interface DetectionMetrics {
-  /** 样本总数 */
+  /** Total sample count */
   support: number;
-  /** 正例（标注为存在）数量 */
+  /** Number of positives (annotated as present) */
   positives: number;
-  /** 触发率，对应论文 Table 1 的 Trigger 列 */
+  /** Trigger rate, corresponding to the Trigger column of Table 1 in the paper */
   triggerRate: number;
   precision: number;
   recall: number;
@@ -55,10 +55,11 @@ export interface DetectionMetrics {
 }
 
 /**
- * 计算逐缺陷检测指标（论文 Table 1 左块）。
+ * Compute per-defect detection metrics (Table 1, left block of the paper).
  *
- * precision / recall / F1 基于二值触发；AP 与 AUROC 基于连续分，
- * 因此二者可能给出不同的强弱判断——这正是论文保留连续分 s_j 的原因。
+ * precision / recall / F1 are based on the binary trigger, while AP and AUROC are based on the
+ * continuous score, so the two can disagree about how strong a detector is -- which is exactly
+ * why the paper retains the continuous score s_j.
  */
 export function computeDetectionMetrics(samples: DetectionSample[]): DetectionMetrics {
   const support = samples.length;
@@ -114,8 +115,9 @@ export function computeDetectionMetrics(samples: DetectionSample[]): DetectionMe
 }
 
 /**
- * Average Precision：按分数降序遍历，对每个正例累加其位置上的精确率。
- * 未做插值，等价于 PR 曲线的阶梯面积。
+ * Average Precision: walk the samples in descending score order and, for each positive,
+ * accumulate the precision at that position. No interpolation is applied, which is equivalent to
+ * the stepwise area under the PR curve.
  */
 export function averagePrecision(labels: boolean[], scores: number[]): number {
   if (labels.length === 0 || labels.length !== scores.length) {
@@ -143,8 +145,9 @@ export function averagePrecision(labels: boolean[], scores: number[]): number {
 }
 
 /**
- * AUROC，用 Mann-Whitney U 的秩形式计算，并列分数由平均秩处理。
- * 当只有单一类别时无定义，返回 0 并由调用方结合 positives 判断。
+ * AUROC, computed via the rank form of Mann-Whitney U, with tied scores handled by average ranks.
+ * It is undefined when only a single class is present; 0 is returned and the caller should judge
+ * that case together with positives.
  */
 export function auroc(labels: boolean[], scores: number[]): number {
   if (labels.length === 0 || labels.length !== scores.length) {
@@ -171,8 +174,8 @@ export function auroc(labels: boolean[], scores: number[]): number {
 }
 
 /**
- * Cohen's kappa（两名标注者，二值判断）。
- * 完全一致且无变异时（两人都判全否）返回 1。
+ * Cohen's kappa (two annotators, binary judgements).
+ * Returns 1 when agreement is perfect and there is no variation (both annotators said no to all).
  */
 export function cohensKappa(annotatorA: boolean[], annotatorB: boolean[]): number {
   const n = Math.min(annotatorA.length, annotatorB.length);
@@ -204,13 +207,13 @@ export function cohensKappa(annotatorA: boolean[], annotatorB: boolean[]): numbe
   return (observed - expected) / (1 - expected);
 }
 
-/** 单条标注记录：两名标注者判断 + 豁免 / 仲裁标记 */
+/** A single annotation record: both annotators' judgements plus exemption / adjudication flags */
 export interface AnnotationPair {
   annotatorA: boolean;
   annotatorB: boolean;
-  /** 是否在任务语境下被判定为豁免 */
+  /** Whether the case was judged exempt given the task context */
   exempt?: boolean;
-  /** 是否因分歧进入第三方仲裁 */
+  /** Whether disagreement sent the case to third-party adjudication */
   adjudicated?: boolean;
 }
 
@@ -222,7 +225,7 @@ export interface AgreementStats {
   adjudicationRate: number;
 }
 
-/** 计算标注一致性统计（论文 Table 5）。一致性在仲裁前计算。 */
+/** Compute annotation agreement statistics (Table 5 of the paper). Agreement is computed before adjudication. */
 export function computeAgreementStats(pairs: AnnotationPair[]): AgreementStats {
   const support = pairs.length;
   if (support === 0) {
@@ -244,11 +247,11 @@ export function computeAgreementStats(pairs: AnnotationPair[]): AgreementStats {
 }
 
 export interface CalibrationComparison {
-  /** 直接硬阈值解释的 ECE */
+  /** ECE under the direct hard-threshold interpretation */
   hardEce: number;
-  /** 校准后验风险的 ECE */
+  /** ECE of the calibrated posterior risk */
   bayesEce: number;
-  /** hard - bayes，正值表示校准带来改善 */
+  /** hard - bayes; a positive value means calibration improved things */
   improvement: number;
   hardBuckets: CalibrationBucket[];
   bayesBuckets: CalibrationBucket[];
@@ -256,10 +259,12 @@ export interface CalibrationComparison {
 }
 
 /**
- * 对比硬阈值与校准后验的 ECE（论文 Table 1 右块 + Figure 7）。
+ * Compare the ECE of the hard threshold against the calibrated posterior
+ * (Table 1, right block + Figure 7 of the paper).
  *
- * hard 分支把二值触发结果当作预测概率（0 或 1），这正是"直接阈值化"的
- * 语义：一旦触发即视为确定存在。bayes 分支使用校准后的后验风险。
+ * The hard branch treats the binary trigger result as the predicted probability (0 or 1), which is
+ * precisely the semantics of "direct thresholding": once triggered, the defect is taken as
+ * certainly present. The bayes branch uses the calibrated posterior risk.
  */
 export function compareCalibration(
   samples: Array<{ label: boolean; triggered: boolean; posteriorRisk: number }>,
@@ -287,14 +292,14 @@ export function compareCalibration(
   };
 }
 
-/** 一个系统在若干样本上的分数序列，用于 bootstrap 排名 */
+/** One system's score series across a set of samples, used for bootstrap ranking */
 export interface RankStabilityInput {
   system: string;
-  /** 逐样本分数（通常是逐轨迹 PB） */
+  /** Per-sample scores (usually the per-trajectory PB) */
   scores: number[];
   /**
-   * 与 scores 等长且顺序对齐的分层标签（通常是 benchmark 来源）。
-   * 缺省时视为单一层。
+   * Stratum labels of the same length as scores and aligned in order (usually the benchmark source).
+   * Treated as a single stratum when omitted.
    */
   strata?: string[];
 }
@@ -305,14 +310,14 @@ export interface RankStabilityRow {
   rankStdDev: number;
   top1Frequency: number;
   top3Frequency: number;
-  /** 各重采样轮次的平均分的均值 */
+  /** Mean of the per-replicate mean scores */
   meanScore: number;
 }
 
 export interface RankStabilityOptions {
   replicates?: number;
   rng?: Rng;
-  /** 排名时分数越高越好 */
+  /** When ranking, higher scores are better */
   higherIsBetter?: boolean;
 }
 
@@ -331,13 +336,15 @@ function groupIndicesByStratum(strata: string[] | undefined, length: number): nu
 }
 
 /**
- * 分层 bootstrap 排名稳定性（论文 Table 6）。
+ * Stratified bootstrap ranking stability (Table 6 of the paper).
  *
- * 每轮在每个系统各自的分层内做有放回重采样，重算该系统均分后对全部系统排名，
- * 统计 mean rank / rank std / Top-1 / Top-3 频率。
+ * Each replicate resamples with replacement within each system's own strata, recomputes that
+ * system's mean score, ranks all systems, and accumulates mean rank / rank std / Top-1 / Top-3
+ * frequencies.
  *
- * 说明：这里按"每个系统在自己的样本集内重采样"实现，因此不要求各系统跑在
- * 完全相同的任务子集上。若各系统任务集一致，该实现与配对重采样在期望上一致。
+ * Note: this is implemented as "each system resamples within its own sample set", so the systems
+ * are not required to run on exactly the same task subset. When their task sets do coincide, this
+ * implementation agrees with paired resampling in expectation.
  */
 export function bootstrapRankStability(
   inputs: RankStabilityInput[],
@@ -405,21 +412,22 @@ export function bootstrapRankStability(
 }
 
 export interface CorrelationMatrix {
-  /** 行/列顺序 */
+  /** Row/column order */
   keys: string[];
-  /** matrix[i][j] 为 keys[i] 与 keys[j] 的相关系数 */
+  /** matrix[i][j] is the correlation coefficient between keys[i] and keys[j] */
   matrix: number[][];
-  /** 参与计算的样本数 */
+  /** Sample count that entered the computation */
   support: number;
   method: 'spearman' | 'pearson';
 }
 
 /**
- * 缺陷间相关矩阵（论文 Figure 6）。
+ * Inter-defect correlation matrix (Figure 6 of the paper).
  *
- * 输入为 key -> 逐轨迹序列，各序列需等长且按同一轨迹顺序对齐。
- * 论文用于检验各缺陷是否塌缩为单一潜在信号，因此默认使用 Spearman
- * （后验风险的分布通常偏斜，秩相关更稳健）。
+ * The input maps each key to a per-trajectory series; all series must be of equal length and
+ * aligned in the same trajectory order. The paper uses this to check whether the defects collapse
+ * into a single latent signal, so Spearman is the default (posterior risk distributions are
+ * usually skewed, and rank correlation is more robust).
  */
 export function computeCorrelationMatrix(
   seriesByKey: Record<string, number[]>,
@@ -449,8 +457,8 @@ export function computeCorrelationMatrix(
 }
 
 /**
- * 缺陷触发与端点失败的关联强度（论文 Figure 2 左）。
- * 返回点二列相关（等价于以 0/1 编码的 Pearson）。
+ * Association strength between defect triggering and endpoint failure (Figure 2, left, of the paper).
+ * Returns the point-biserial correlation (equivalent to Pearson over 0/1 encodings).
  */
 export function defectFailureAssociation(
   triggered: boolean[],

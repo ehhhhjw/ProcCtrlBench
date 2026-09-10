@@ -1,153 +1,153 @@
-# 评测基准方案总览
+# Evaluation Benchmark Scheme Overview
 
-本文整合当前实现下 11 个评测基准的定义、信号、阈值、误报控制和整改建议。当前实现是非评分制，issue 的严重度用于诊断和排序，不生成总分。
+This document consolidates the definitions, signals, thresholds, false positive control, and remediation recommendations of the 11 evaluation benchmarks under the current implementation. The current implementation is non-scored: the severity of an issue is used for diagnosis and ranking, and no total score is produced.
 
-## 通用增强
+## Common Enhancements
 
-- AST 符号级分析：
+- AST symbol-level analysis:
   - [src/analyzers/AstAnalyzer.ts](./src/analyzers/AstAnalyzer.ts)
-- 项目分析入口：
+- Project analysis entry points:
   - [config/project-analysis.config.json](./config/project-analysis.config.json)
   - [scripts/build-file-graph.ts](./scripts/build-file-graph.ts)
-- 项目 AST：
+- Project AST:
   - [output/project-ast.json](./output/project-ast.json)
-- 文件图谱：
+- File graph:
   - [output/file-graph.json](./output/file-graph.json)
-- 预警：
+- Prewarn:
   - [output/prewarn.json](./output/prewarn.json)
 
 ## 1. Ghost Context
 
-- 阈值：
+- Thresholds:
   - warning `512`
   - error `1024`
-- 典型 issue：
-  - 摘要与原文长时间共存
-  - 不可消费 payload
-  - 有摘要但后续不再引用的历史结果
+- Typical issues:
+  - a summary coexisting with its source text for a long time
+  - unconsumable payload
+  - historical results that have a summary but are no longer referenced afterwards
 
 ## 2. Oversized Rules
 
-- 阈值：
+- Thresholds:
   - token warning `2000`
   - token error `4000`
   - ratio warning `0.20`
   - ratio error `0.35`
-- 典型 issue：
-  - `system` 规则过大
-  - `system` 规则占比过高
-  - `system` 规则成为最大静态块
+- Typical issues:
+  - oversized `system` rules
+  - `system` rules occupying too large a share
+  - `system` rules becoming the largest static block
 
 ## 3. Context Thrashing
 
-- 阈值：
+- Thresholds:
   - `windowThreshold = 0.75`
   - `compressionLookAhead = 2`
-- 典型 issue：
+- Typical issues:
   - timing fault
   - payload oversize fault
 
 ## 4. Tool Call Chain
 
-- 阈值：
+- Thresholds:
   - repetitive warning `6`
   - repetitive error `10`
   - cyclic warning `3`
   - cyclic error `5`
-- 豁免：
-  - 多样输入
-  - 合理批处理
-  - 收敛搜索
+- Exemptions:
+  - diverse inputs
+  - legitimate batch processing
+  - convergent search
 
 ## 5. Dead Step
 
-- 关键检查：
-  - 后续工具输入引用
-  - assistant 文本引用
-  - 文件操作引用
-  - 分支变化
-- 当前规则：
-  - `Write` 不是 dead step
-- 增强：
-  - AST 符号引用
-  - 项目 related files 间接引用
+- Key checks:
+  - reference by a subsequent tool input
+  - reference by assistant text
+  - reference by a file operation
+  - branch change
+- Current rule:
+  - `Write` is not a dead step
+- Enhancements:
+  - AST symbol references
+  - indirect references via project related files
 
 ## 6. Duplicate Step
 
-- 关键检查：
-  - 输入结构相似度
-  - 中间无相关文件变更
-  - 输出相似度
-  - AST 符号 Jaccard 重合度
-- 豁免：
-  - 时变命令
-  - 测试型重复命令
+- Key checks:
+  - structural similarity of the inputs
+  - no relevant file changes in between
+  - similarity of the outputs
+  - Jaccard overlap of AST symbols
+- Exemptions:
+  - time-varying commands
+  - test-style repeated commands
 
 ## 7. Wrapper Workflow
 
-- 统计起点：
-  - 同一 Agent 至少调用 `5` 次才开始判定
-- 典型信号：
-  - 内部步骤少
-  - 单一下游工具类型
-  - 输入输出高度相似
-  - 无验证
-  - 符号增量低
+- Statistical starting point:
+  - judgment begins only once the same agent has been called at least `5` times
+- Typical signals:
+  - few internal steps
+  - a single downstream tool type
+  - highly similar input and output
+  - no verification
+  - low symbol increment
 
 ## 8. Context Coupling
 
-- 典型信号：
+- Typical signals:
   - SCC
-  - 交替调用
-  - 回边
-  - 代码邻域回流
+  - alternating calls
+  - back edges
+  - code neighborhood backflow
 
 ## 9. Long Chain
 
-- 阈值：
+- Thresholds:
   - effective warning `12`
   - effective error `20`
   - simple warning `25`
   - simple error `40`
-- 增强：
-  - 隐式子任务识别
-  - 隐式检查点识别
+- Enhancements:
+  - implicit subtask identification
+  - implicit checkpoint identification
 
 ## 10. Interface Inconsistency
 
-- 典型信号：
-  - 参数名差异
-  - 参数类型差异
-  - 结果形态差异
-  - 结果符号类型差异
-  - 语义重合度高但接口仍不一致
+- Typical signals:
+  - parameter name divergence
+  - parameter type divergence
+  - result shape divergence
+  - result symbol type divergence
+  - high semantic overlap while the interfaces remain inconsistent
 
 ## 11. Weak Tool
 
-- 典型信号：
-  - 调用率低
-  - 替代工具高频出现
-  - 项目 AST 增强后仍然低触发
+- Typical signals:
+  - low call rate
+  - alternative tools appearing at high frequency
+  - still low triggering even after project AST enhancement
 
 ## Task Outcome
 
-当前是质量摘要，不是评分项。
+This is currently a quality summary, not a scored item.
 
 - `taskCompletionRate`
 - `outputExecutability`
 - `postModificationVerificationRate`
 
-## 聚合方式
+## Aggregation Method
 
-[src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts) 当前输出：
+[src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts) currently reports:
 
-- 平均告警数
-- 平均错误数
+- average number of warnings
+- average number of errors
 - 95% CI
 
-如果需要 before / after 对比，建议比较：
+If a before / after comparison is required, the recommended quantities to compare are:
 
-- 总告警数变化
-- 总错误数变化
-- 关键 issue 是否消失
-- `taskOutcome.details` 是否改善
+- the change in the total number of warnings
+- the change in the total number of errors
+- whether key issues have disappeared
+- whether `taskOutcome.details` has improved

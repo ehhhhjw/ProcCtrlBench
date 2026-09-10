@@ -1,16 +1,16 @@
-# 使用指南
+# Usage Guide
 
-## 当前评估模型
+## Current Evaluation Model
 
-当前实现是非评分制评估。
+The current implementation is a non-scoring evaluation.
 
-报告的核心对象是：
+The core objects reported are:
 
 - `taskOutcome`
   - `taskCompletionRate`
   - `outputExecutability`
   - `postModificationVerificationRate`
-- 四个问题维度
+- Four problem dimensions
   - `contextManagement`
   - `toolUseEfficiency`
   - `workflowArchitecture`
@@ -18,13 +18,13 @@
 - `diagnostics`
 - `summary`
 
-不再返回：
+No longer returned:
 
 - `totalScore`
 - `overallAssessment`
-- 维度级 `score`
+- Dimension-level `score`
 
-## 基本调用
+## Basic Invocation
 
 ```typescript
 import { AgentEvaluator } from './src/AgentEvaluator';
@@ -40,21 +40,21 @@ async function evaluateSession() {
 }
 ```
 
-保存报告：
+Save the report:
 
 ```typescript
 await evaluator.evaluateAndSave('./output', ['json', 'markdown']);
 ```
 
-## 项目分析与 AST 增强
+## Project Analysis and AST Enhancement
 
-### 配置入口
+### Configuration Entry Point
 
-项目分析配置文件：
+Project analysis configuration file:
 
 - [config/project-analysis.config.json](./config/project-analysis.config.json)
 
-示例：
+Example:
 
 ```json
 {
@@ -64,32 +64,32 @@ await evaluator.evaluateAndSave('./output', ['json', 'markdown']);
 }
 ```
 
-### 执行
+### Execution
 
 ```bash
 npm run analyze:project
 ```
 
-### 产物
+### Artifacts
 
 - [output/project-ast.json](./output/project-ast.json)
 - [output/file-graph.json](./output/file-graph.json)
 
-### 作用
+### Purpose
 
 - `project-ast.json`
-  - 文件定义了哪些符号
-  - 文件使用了哪些符号
-  - 哪些文件彼此相关
-  - 代码邻域如何扩展
+  - Which symbols a file defines
+  - Which symbols a file uses
+  - Which files are related to each other
+  - How the code neighborhood expands
 - `file-graph.json`
-  - 从外部 related files 数据补充“实现链路上的相关文件”
+  - Supplements the "related files along the implementation chain" from external related files data
 
-这些数据会被 `DeadStep`、`DuplicateStep`、`LongChain`、`ToolChain`、`InterfaceConsistency` 等检测器使用。
+This data is consumed by detectors such as `DeadStep`, `DuplicateStep`, `LongChain`, `ToolChain`, and `InterfaceConsistency`.
 
-## 报告结构
+## Report Structure
 
-### 顶层字段
+### Top-Level Fields
 
 ```json
 {
@@ -115,15 +115,15 @@ npm run analyze:project
 }
 ```
 
-说明：
+Notes:
 
-- 这是质量摘要。
-- 这三个值范围是 `0~1`。
-- 它们用于描述任务结果质量，不再对外汇总成总分。
+- This is a quality summary.
+- These three values range from `0~1`.
+- They describe the quality of the task outcome and are no longer aggregated into an externally reported total score.
 
-### 其他四个维度
+### The Other Four Dimensions
 
-每个维度结构一致：
+Every dimension shares the same structure:
 
 ```json
 {
@@ -152,18 +152,18 @@ npm run analyze:project
 {
   "metric": "deadStep",
   "severity": "warning",
-  "message": "检测到死步骤: Read 的结果未被后续流程有效引用",
+  "message": "Dead step detected: the result of Read is never effectively referenced by the subsequent workflow",
   "location": {
     "toolUseId": "toolu_123"
   },
-  "suggestion": "该步骤的结果似乎未被使用。考虑移除此步骤或确保其结果被后续步骤引用"
+  "suggestion": "The result of this step appears to be unused. Consider removing this step or making sure its result is referenced by a subsequent step"
 }
 ```
 
-说明：
+Notes:
 
-- 不再暴露 `deduction`。
-- detector 内部仍可能保留严重性权重，用于 issue 排序和 `keyIssues` 选择。
+- `deduction` is no longer exposed.
+- Detectors may still keep severity weights internally, used for issue ranking and `keyIssues` selection.
 
 ### `summary`
 
@@ -172,18 +172,18 @@ npm run analyze:project
   "totalWarnings": 6,
   "totalErrors": 1,
   "keyIssues": [
-    "检测到重复工具调用链: Read 连续调用 12 次"
+    "Repetitive tool call chain detected: Read invoked 12 times in a row"
   ],
   "strengths": [
-    "任务完成质量稳定",
-    "工具使用效率高"
+    "Consistent task completion quality",
+    "High tool use efficiency"
   ]
 }
 ```
 
-## 可配置项
+## Configurable Items
 
-当前主要配置在 [src/config/evaluation.config.ts](./src/config/evaluation.config.ts)：
+The main configuration currently lives in [src/config/evaluation.config.ts](./src/config/evaluation.config.ts):
 
 - `thresholds.ghostContext`
 - `thresholds.oversizedRules`
@@ -192,7 +192,7 @@ npm run analyze:project
 - `thresholds.longChain`
 - `contextWindowSize`
 
-示例：
+Example:
 
 ```typescript
 import { DEFAULT_EVALUATION_CONFIG } from './src/config/evaluation.config';
@@ -211,31 +211,31 @@ const customConfig = {
 };
 ```
 
-## Benchmark 汇总
+## Benchmark Aggregation
 
-`BenchmarkRunner` 当前聚合的是各维度的告警数和错误数。
+`BenchmarkRunner` currently aggregates the warning count and error count of each dimension.
 
-输出内容：
+Output contents:
 
-- 每维度平均告警数
-- 每维度平均错误数
+- Average warning count per dimension
+- Average error count per dimension
 - 95% CI
-- 前两份报告的简单 Cohen's d 示例
+- A simple Cohen's d example over the first two reports
 
-不再聚合：
+No longer aggregated:
 
-- 平均分
-- 总分分布
-- 等级分布
+- Average score
+- Total score distribution
+- Grade distribution
 
-## 当前实现中的几个关键点
+## Key Points of the Current Implementation
 
-- `Write` 不会被判定为 `deadStep`。
-- `LongChain` 会结合显式子任务、显式检查点、隐式代码簇切换和隐式验证检查点。
-- `DuplicateStep` 会结合 AST 符号重合度和文件关系增强语义重复判断。
-- `InterfaceConsistency` 和 `WeakTool` 已接入项目级 AST / 文件关系信息。
+- `Write` is never judged as a `deadStep`.
+- `LongChain` combines explicit subtasks, explicit checkpoints, implicit code cluster switches, and implicit verification checkpoints.
+- `DuplicateStep` combines AST symbol overlap and file relationships to strengthen semantic duplication judgment.
+- `InterfaceConsistency` and `WeakTool` are already wired into project-level AST / file relationship information.
 
-## 推荐阅读顺序
+## Recommended Reading Order
 
 1. [README.md](./README.md)
 2. [QUICKSTART.md](./QUICKSTART.md)

@@ -1,17 +1,17 @@
-# 快速开始指南
+# Quick Start Guide
 
-本指南对应当前实现：非评分制、AST 增强、项目级文件关系增强。
+This guide matches the current implementation: non-scoring, AST-enhanced, and enhanced with project-level file relationships.
 
-## 1. 安装与编译
+## 1. Install and Build
 
 ```bash
 npm install
 npm run build
 ```
 
-## 2. 可选：先做项目分析
+## 2. Optional: Run Project Analysis First
 
-在 [config/project-analysis.config.json](./config/project-analysis.config.json) 里配置：
+Configure it in [config/project-analysis.config.json](./config/project-analysis.config.json):
 
 ```json
 {
@@ -21,49 +21,49 @@ npm run build
 }
 ```
 
-然后执行：
+Then run:
 
 ```bash
 npm run analyze:project
 ```
 
-这一步会生成：
+This step generates:
 
 - [output/project-ast.json](./output/project-ast.json)
 - [output/file-graph.json](./output/file-graph.json)
 
-## 3. 运行示例评估
+## 3. Run the Example Evaluation
 
 ```bash
 npm run example
 ```
 
-你会看到类似输出：
+You will see output similar to:
 
 ```text
-开始评估 Run ID: a3d0cc87
-评估工具使用效率...
-  - 告警: 3, 错误: 1
-评估工作流架构...
-  - 告警: 2, 错误: 0
-评估上下文管理...
-  - 告警: 1, 错误: 0
-评估工具生态一致性...
-  - 告警: 0, 错误: 0
-评估任务结果...
-  - 完成率: 100%, 可执行性: 75%, 验证率: 80%
-生成评估报告...
-评估完成! 已生成非评分制诊断报告
-总告警: 6, 总错误: 1
+Starting evaluation, Run ID: a3d0cc87
+Evaluating tool use efficiency...
+  - Warnings: 3, Errors: 1
+Evaluating workflow architecture...
+  - Warnings: 2, Errors: 0
+Evaluating context management...
+  - Warnings: 1, Errors: 0
+Evaluating tool ecosystem consistency...
+  - Warnings: 0, Errors: 0
+Evaluating task outcome...
+  - Completion rate: 100%, Executability: 75%, Verification rate: 80%
+Generating evaluation report...
+Evaluation complete! Non-scoring diagnostic report generated
+Total warnings: 6, Total errors: 1
 ```
 
-## 4. 查看报告
+## 4. Review the Report
 
-生成目录：
+Output directory:
 
 - [output/evaluation-reports](./output/evaluation-reports)
 
-JSON 报告重点看：
+In the JSON report, focus on:
 
 - `summary.totalWarnings`
 - `summary.totalErrors`
@@ -72,14 +72,14 @@ JSON 报告重点看：
 - `dimensions.contextManagement/details`
 - `diagnostics`
 
-Markdown 报告重点看：
+In the Markdown report, focus on:
 
-- 概览
-- 维度摘要
-- 关键问题
-- 详细诊断
+- Overview
+- Dimension summary
+- Key issues
+- Detailed diagnostics
 
-## 5. 最小调用示例
+## 5. Minimal Invocation Example
 
 ```typescript
 import { AgentEvaluator } from './src/AgentEvaluator';
@@ -96,18 +96,18 @@ async function main() {
 main();
 ```
 
-## 6. 批量基准汇总
+## 6. Batch Benchmark Aggregation
 
-如果目录里已经有多份 JSON 报告，可以运行：
+If a directory already contains multiple JSON reports, you can run:
 
 ```bash
 npx ts-node src/benchmark/BenchmarkRunner.ts ./output/evaluation-reports ./output/benchmark/summary.md
 ```
 
-当前汇总输出的是：
+The aggregation currently outputs:
 
-- 每个维度的平均告警数
-- 每个维度的平均错误数
-- 对应 95% CI
+- Average warning count per dimension
+- Average error count per dimension
+- The corresponding 95% CI
 
-不再输出平均分或评级。
+Average scores and grades are no longer output.

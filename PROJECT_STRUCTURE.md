@@ -1,6 +1,6 @@
-# 项目结构
+# Project Structure
 
-## 顶层目录
+## Top-Level Directories
 
 ```text
 benchmark_mvp/
@@ -31,13 +31,13 @@ src/
 └── types/
 ```
 
-### 入口
+### Entry Points
 
 - [src/AgentEvaluator.ts](./src/AgentEvaluator.ts)
-  - 主评估入口
-  - 串联 5 个维度评估器
+  - Main evaluation entry point
+  - Chains the 5 dimension evaluators together
 - [src/index.ts](./src/index.ts)
-  - 公共导出
+  - Public exports
 
 ### `src/types/`
 
@@ -47,37 +47,37 @@ src/
   - `EvaluationReport`
   - `DetectionIssue`
 - [src/types/metrics.types.ts](./src/types/metrics.types.ts)
-  - 各 detector 辅助类型
+  - Helper types for each detector
 
 ### `src/config/`
 
 - [src/config/evaluation.config.ts](./src/config/evaluation.config.ts)
-  - 阈值配置
-  - 上下文窗口大小
+  - Threshold configuration
+  - Context window size
 - [config/project-analysis.config.json](./config/project-analysis.config.json)
-  - 项目路径
-  - 输出目录
-  - 外部 related files 数据路径
+  - Project path
+  - Output directory
+  - Path to external related files data
 
 ### `src/evaluators/`
 
 - [src/evaluators/BaseEvaluator.ts](./src/evaluators/BaseEvaluator.ts)
-  - 通用 issue 统计
+  - Shared issue statistics
 - [src/evaluators/TaskOutcomeEvaluator.ts](./src/evaluators/TaskOutcomeEvaluator.ts)
-  - 任务结果质量摘要
+  - Task outcome quality summary
 - [src/evaluators/ContextManagementEvaluator.ts](./src/evaluators/ContextManagementEvaluator.ts)
 - [src/evaluators/ToolUseEfficiencyEvaluator.ts](./src/evaluators/ToolUseEfficiencyEvaluator.ts)
 - [src/evaluators/WorkflowArchitectureEvaluator.ts](./src/evaluators/WorkflowArchitectureEvaluator.ts)
 - [src/evaluators/ToolEcosystemEvaluator.ts](./src/evaluators/ToolEcosystemEvaluator.ts)
 
-说明：
+Notes:
 
-- evaluator 现在不再产出分数。
-- 产出的是 `warnings`、`errors`、`issues` 和 `details`。
+- Evaluators no longer produce scores.
+- What they produce is `warnings`, `errors`, `issues`, and `details`.
 
 ### `src/detectors/`
 
-11 个基准对应的 detector：
+Detectors corresponding to the 11 benchmarks:
 
 - [src/detectors/GhostContextDetector.ts](./src/detectors/GhostContextDetector.ts)
 - [src/detectors/OversizedRulesDetector.ts](./src/detectors/OversizedRulesDetector.ts)
@@ -94,48 +94,48 @@ src/
 ### `src/analyzers/`
 
 - [src/analyzers/AstAnalyzer.ts](./src/analyzers/AstAnalyzer.ts)
-  - tree-sitter 多语言 AST
+  - Multi-language AST via tree-sitter
 - [src/analyzers/ProjectAstLoader.ts](./src/analyzers/ProjectAstLoader.ts)
-  - 项目 AST 关系加载
+  - Loads project AST relationships
 - [src/analyzers/FileAssociationLoader.ts](./src/analyzers/FileAssociationLoader.ts)
-  - 外部 related files 图谱加载
+  - Loads the external related files graph
 - [src/analyzers/CodeContextAnalyzer.ts](./src/analyzers/CodeContextAnalyzer.ts)
-  - 工具 / 文本 / 消息的代码上下文足迹
+  - Code context footprint of tools / text / messages
 - [src/analyzers/ContentSimilarityAnalyzer.ts](./src/analyzers/ContentSimilarityAnalyzer.ts)
-  - 文本与结构相似度
+  - Textual and structural similarity
 
 ### `src/scoring/`
 
 - [src/scoring/ScoreCalculator.ts](./src/scoring/ScoreCalculator.ts)
-  - 兼容旧类名
-  - 当前职责是评估报告组装
+  - Retains the legacy class name for compatibility
+  - Its current responsibility is assembling the evaluation report
 - [src/scoring/ReportGenerator.ts](./src/scoring/ReportGenerator.ts)
-  - JSON / Markdown 报告生成
+  - JSON / Markdown report generation
 
 ### `src/benchmark/`
 
 - [src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts)
-  - 聚合多份报告
-  - 输出平均告警数、平均错误数和 95% CI
+  - Aggregates multiple reports
+  - Outputs average warning count, average error count, and 95% CI
 - [src/benchmark/Stats.ts](./src/benchmark/Stats.ts)
-  - 统计计算
+  - Statistical computation
 
-## 数据流
+## Data Flow
 
 ```text
-JSONL 会话
-  -> ClaudeCodeStructure 解析
+JSONL session
+  -> ClaudeCodeStructure parsing
   -> AgentEvaluator
-  -> 各维度 evaluator
-  -> 11 个 detector
+  -> per-dimension evaluators
+  -> 11 detectors
   -> EvaluationResult
-  -> ScoreCalculator(报告组装)
+  -> ScoreCalculator (report assembly)
   -> EvaluationReport
   -> ReportGenerator
-  -> JSON / Markdown 报告
+  -> JSON / Markdown report
 ```
 
-## 输出目录
+## Output Directory
 
 ```text
 output/
@@ -146,9 +146,9 @@ output/
 └── prewarn.json
 ```
 
-## 当前文档状态
+## Current Documentation Status
 
-以以下文件为准：
+The following files are authoritative:
 
 - [README.md](./README.md)
 - [QUICKSTART.md](./QUICKSTART.md)

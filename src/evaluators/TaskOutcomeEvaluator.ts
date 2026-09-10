@@ -3,21 +3,21 @@ import { SessionData, MessageNode } from '../../ClaudeCodeStructure/src/types';
 import { EvaluationConfig, EvaluationResult, Severity } from '../types/evaluation.types';
 
 /**
- * 任务结果评估器
- * 评估任务完成质量，包括成功率、可执行性和验证通过率
+ * Task outcome evaluator
+ * Evaluates task completion quality, including success rate, executability, and verification pass rate
  */
 export class TaskOutcomeEvaluator extends BaseEvaluator {
   readonly name = 'TaskOutcomeEvaluator';
-  readonly description = '评估任务结果质量，包括任务成功率、输出可执行性和验证通过率';
+  readonly description = 'Evaluates task outcome quality, including task success rate, output executability, and verification pass rate';
 
   async evaluate(): Promise<EvaluationResult> {
-    // 1. 评估任务完成率
+    // 1. Evaluate the task completion rate
     const completionRate = this.evaluateTaskCompletionRate();
 
-    // 2. 评估输出可执行性
+    // 2. Evaluate output executability
     const executability = this.evaluateOutputExecutability();
 
-    // 3. 评估验证通过率
+    // 3. Evaluate the verification pass rate
     const verificationRate = this.evaluateVerificationRate();
 
     return {
@@ -34,8 +34,8 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 评估任务完成率
-   * 基于启发式分析session是否成功完成
+   * Evaluate the task completion rate
+   * Use heuristics to determine whether the session completed successfully
    */
   private evaluateTaskCompletionRate(): number {
     const indicators = {
@@ -46,7 +46,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
       sessionNotAborted: this.sessionNotAborted(),
     };
 
-    // 计算通过的指标数量
+    // Count the passing indicators
     const passedCount = Object.values(indicators).filter(v => v).length;
     const totalCount = Object.keys(indicators).length;
 
@@ -54,8 +54,8 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 评估输出可执行性
-   * 检查生成的代码/文件是否可执行
+   * Evaluate output executability
+   * Check whether generated code and files are executable
    */
   private evaluateOutputExecutability(): number {
     const indicators = {
@@ -72,8 +72,8 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 评估验证通过率
-   * 检查修改后是否进行了验证，以及验证是否通过
+   * Evaluate the verification pass rate
+   * Check whether changes were verified and whether verification passed
    */
   private evaluateVerificationRate(): number {
     const modifications = this.countFileModifications();
@@ -81,25 +81,25 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
     const passedVerifications = this.countPassedVerifications();
 
     if (modifications === 0) {
-      return 1.0; // 没有修改，不需要验证
+      return 1.0; // No changes, so verification is unnecessary
     }
 
     if (verifications === 0) {
-      return 0.3; // 有修改但没有验证
+      return 0.3; // Changes were made but not verified
     }
 
-    // 验证通过率
+    // Verification pass rate
     const passRate = verifications > 0 ? passedVerifications / verifications : 0;
 
-    // 验证覆盖率
+    // Verification coverage rate
     const coverageRate = Math.min(verifications / modifications, 1.0);
 
-    // 综合质量指标
+    // Combined quality metric
     return passRate * 0.7 + coverageRate * 0.3;
   }
 
   /**
-   * 检查是否有文件变更
+   * Check for file changes
    */
   private hasFileChanges(): boolean {
     for (const toolUse of this.sessionData.toolUses.values()) {
@@ -114,7 +114,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查是否有成功的命令执行
+   * Check for successful command executions
    */
   private hasSuccessfulCommands(): boolean {
     let successCount = 0;
@@ -134,10 +134,10 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查是否没有致命错误
+   * Check that there are no fatal errors
    */
   private noFatalErrors(): boolean {
-    // 检查最后几条消息是否包含错误关键词
+    // Check the latest messages for error keywords
     const messages = Array.from(this.sessionData.messages.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
@@ -166,7 +166,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查是否有积极的结论
+   * Check for a positive conclusion
    */
   private hasPositiveConclusion(): boolean {
     const messages = Array.from(this.sessionData.messages.values())
@@ -200,15 +200,15 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查session是否被中止
+   * Check whether the session was aborted
    */
   private sessionNotAborted(): boolean {
-    // 检查是否有正常结束的迹象
+    // Check for signs of a normal ending
     const messages = Array.from(this.sessionData.messages.values());
 
     if (messages.length === 0) return false;
 
-    // 如果最后一条消息是user消息且没有回复，可能是中止
+    // An unanswered final user message may indicate an abort
     const lastMessage = messages[messages.length - 1];
     if (lastMessage.type === 'user' && lastMessage.children.length === 0) {
       return false;
@@ -218,7 +218,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查是否有编译检查
+   * Check for a compilation check
    */
   private hasCompilationCheck(): boolean {
     for (const toolUse of this.sessionData.toolUses.values()) {
@@ -247,7 +247,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查是否有语法验证
+   * Check for syntax validation
    */
   private hasSyntaxValidation(): boolean {
     for (const toolUse of this.sessionData.toolUses.values()) {
@@ -274,7 +274,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 检查是否没有编译错误
+   * Check that there are no compilation errors
    */
   private noCompilationErrors(): boolean {
     let hasCompilation = false;
@@ -296,17 +296,17 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
       }
     }
 
-    // 如果没有编译步骤，默认通过
+    // Pass by default when there is no compilation step
     if (!hasCompilation) return true;
 
     return !hasError;
   }
 
   /**
-   * 检查是否有可运行的输出
+   * Check for runnable output
    */
   private hasRunnableOutput(): boolean {
-    // 检查是否创建了可执行文件
+    // Check whether an executable file was created
     for (const toolUse of this.sessionData.toolUses.values()) {
       if (toolUse.name === 'Write') {
         const filePath = toolUse.input.file_path || '';
@@ -324,7 +324,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 统计文件修改次数
+   * Count file modifications
    */
   private countFileModifications(): number {
     let count = 0;
@@ -342,7 +342,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 统计验证次数
+   * Count verification attempts
    */
   private countVerifications(): number {
     let count = 0;
@@ -375,7 +375,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 统计通过的验证次数
+   * Count passed verification attempts
    */
   private countPassedVerifications(): number {
     let count = 0;
@@ -398,7 +398,7 @@ export class TaskOutcomeEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 提取内容
+   * Extract content
    */
   private extractContent(content: any): string {
     if (typeof content === 'string') {

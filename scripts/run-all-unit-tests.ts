@@ -4,7 +4,7 @@ function run(cmd: string) {
   execSync(cmd, { stdio: 'inherit' });
 }
 
-// 统一运行所有单测（需先构建）
+// Run all unit tests in one pass (requires a build first)
 run("npm run build");
 run("npx ts-node -O '{\"types\":[\"node\",\"./src/types/externals.d.ts\"],\"skipLibCheck\":true}' scripts/unit/deadstep-indirect-ref.ts");
 run("npx ts-node -O '{\"types\":[\"node\",\"./src/types/externals.d.ts\"],\"skipLibCheck\":true}' scripts/unit/deadstep-write-exempt.ts");

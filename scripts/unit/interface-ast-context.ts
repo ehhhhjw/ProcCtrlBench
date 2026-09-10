@@ -175,7 +175,7 @@ async function detectSemanticOverlap(): Promise<{ overlap: number; debug: Record
   const usedTools = detector.collectUsedTools();
   const analysis = detector.analyzeCluster(['Read', 'Grep'], usedTools);
   if (analysis.semanticOverlap === undefined) {
-    throw new Error('未能从 file_read 集群中提取 semanticOverlap');
+    throw new Error('Failed to extract semanticOverlap from the file_read cluster');
   }
   return {
     overlap: Number(analysis.semanticOverlap),
@@ -206,11 +206,11 @@ async function main() {
 
     if (!(withAst.overlap > withoutAst.overlap)) {
       console.error(JSON.stringify({ withAst: withAst.debug, withoutAst: withoutAst.debug }, null, 2));
-      console.error(`期望项目 AST 提升工具上下文重合度估计，但得到 withAst=${withAst.overlap}, withoutAst=${withoutAst.overlap}`);
+      console.error(`Expected the project AST to raise the estimated tool context overlap, but got withAst=${withAst.overlap}, withoutAst=${withoutAst.overlap}`);
       process.exit(1);
     }
 
-    console.log('[ok] interface-ast-context: 项目 AST 提升接口一致性中的上下文重合度判断');
+    console.log('[ok] interface-ast-context: the project AST improves the context overlap judgement in interface consistency');
   } finally {
     restoreFile(projectAstPath, backupPath);
   }

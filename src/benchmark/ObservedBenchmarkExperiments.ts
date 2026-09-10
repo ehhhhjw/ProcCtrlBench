@@ -54,8 +54,9 @@ export interface ObservedTrajectoryRecord {
   analyzedSteps: number;
   totalEvents: number;
   /**
-   * ProcCtrlBench 记分卡（论文 3.4 / 3.5 节）。
-   * Q 维度分按论文分类学计算，注意 longChain 计入 Qtool 而非 Qwf。
+   * ProcCtrlBench scorecard (Sections 3.4 / 3.5 of the paper).
+   * The Q dimension scores follow the paper's taxonomy; note that longChain counts toward Qtool
+   * rather than Qwf.
    */
   qCtx: number;
   qTool: number;
@@ -63,9 +64,9 @@ export interface ObservedTrajectoryRecord {
   qEco: number;
   qDef: number;
   pb: number;
-  /** 计算 pb 时使用的 eta，写入记录以便产出可追溯 */
+  /** The eta used when computing pb, recorded so the output stays traceable */
   pbEta: number;
-  /** 逐缺陷后验风险 p_j，供缺陷间相关矩阵与校准分析使用 */
+  /** Per-defect posterior risk p_j, for the inter-defect correlation matrix and calibration analysis */
   ghostContextPosteriorRisk: number;
   oversizedRulesPosteriorRisk: number;
   thrashingPosteriorRisk: number;
@@ -166,7 +167,7 @@ export function reportToObservedTrajectoryRecord(
   options?: {
     variant?: string;
     reportPath?: string;
-    /** 记分卡参数（eta / 维度权重）；缺省时使用 ProcCtrlScorecard 的默认值 */
+    /** Scorecard parameters (eta / dimension weights); falls back to ProcCtrlScorecard's defaults */
     scorecard?: ScorecardOptions;
   }
 ): ObservedTrajectoryRecord {
@@ -391,12 +392,13 @@ export function computeSweControlSummary(
 }
 
 /**
- * 数据集内相对定义的脆弱成功率：成功但 CP 低于本批样本均值，且触发了
- * longChain / deadStep。
+ * Dataset-relative fragile success rate: successful with CP below this batch's mean
+ * and longChain / deadStep triggered.
  *
- * 注意适用边界：阈值随所传入样本的均值漂移，因此该指标只适合在**同一批**
- * 样本内部做描述性分析，不能用于跨系统横向比较。论文 Table 2 / Table 4 的
- * 脆弱成功率请使用 ProcCtrlScorecard.isFragileSuccess 的绝对阈值定义。
+ * Scope limitation: the threshold shifts with the mean of the supplied samples, so this
+ * metric is suitable only for descriptive analysis within the **same batch**, not for
+ * cross-system comparisons. For the fragile success rate in Tables 2 and 4, use the
+ * absolute threshold defined by ProcCtrlScorecard.isFragileSuccess.
  */
 export function computeFragileSuccessRate(records: ObservedTrajectoryRecord[]): number {
   const successful = records.filter((record) => record.success === true);

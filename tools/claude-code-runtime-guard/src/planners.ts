@@ -42,9 +42,9 @@ class GhostContextPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '检测到上下文中存在未被消费的大载荷，建议先压缩再继续。',
-      suggestion: this.defaultSuggestion(context.issue) || '保留和当前目标文件、目标符号直接相关的结论，移除原始大块内容。',
-      prompt: '请先总结上一段大载荷中与当前目标直接相关的结论，仅保留必要事实，再决定下一步工具调用。',
+      summary: 'Detected a large unconsumed payload in the context; compress it before continuing.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Keep only the conclusions directly related to the current target file and target symbol, and remove the original bulk content.',
+      prompt: 'First summarize the conclusions from the previous large payload that are directly relevant to the current goal, keep only the necessary facts, then decide on the next tool call.',
       shouldBlock: this.shouldBlock(context),
       tags: ['context', 'compression', 'payload'],
     };
@@ -57,9 +57,9 @@ class OversizedRulesPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '规则块过大，正在挤压有效执行上下文。',
-      suggestion: this.defaultSuggestion(context.issue) || '把长规则改成最小工作集，并把细则下沉到外部文档或按需引用。',
-      prompt: '请将当前规则缩减为解决本子问题所必需的最小集合，不要重复注入长篇静态说明。',
+      summary: 'The rule block is too large and is squeezing out effective execution context.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Reduce the long rules to a minimal working set, and push the details into an external document or reference them on demand.',
+      prompt: 'Reduce the current rules to the minimal set required to solve this subproblem; do not repeatedly inject long static instructions.',
       shouldBlock: this.shouldBlock(context),
       tags: ['context', 'rules'],
     };
@@ -72,9 +72,9 @@ class ContextThrashingPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '检测到即将发生上下文抖动，当前大读取很可能被快速压缩丢弃。',
-      suggestion: this.defaultSuggestion(context.issue) || '先做搜索或符号定位，再只读取命中片段。',
-      prompt: '在继续读取大对象之前，先用更窄的搜索策略缩小范围，避免读入后马上被压缩。',
+      summary: 'Context thrashing is imminent; the current large read is likely to be compacted away almost immediately.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Search or locate the symbol first, then read only the matching fragment.',
+      prompt: 'Before reading a large object, narrow the scope with a tighter search strategy so that it is not compacted right after being read.',
       shouldBlock: this.shouldBlock(context),
       tags: ['context', 'thrashing', 'read-scope'],
     };
@@ -87,9 +87,9 @@ class ToolCallChainPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '工具调用链重复或循环，当前策略正在空转。',
-      suggestion: this.defaultSuggestion(context.issue) || '停止重复调用同一工具，切换到批处理、收敛搜索或验证步骤。',
-      prompt: '不要继续重复相同工具链。请先说明已有结果不足之处，然后换用更高信息增益的下一步。',
+      summary: 'The tool call chain is repeating or looping; the current strategy is spinning in place.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Stop calling the same tool repeatedly; switch to batching, a narrowed search, or a verification step.',
+      prompt: 'Do not keep repeating the same tool chain. First state what is missing from the results you already have, then switch to a next step with higher information gain.',
       shouldBlock: this.shouldBlock(context),
       tags: ['tools', 'loop', 'efficiency'],
     };
@@ -102,9 +102,9 @@ class DeadStepPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '上一工具结果尚未进入后续决策链，存在死步骤风险。',
-      suggestion: this.defaultSuggestion(context.issue) || '在继续之前明确上一结果对当前目标的作用。',
-      prompt: '先说明上一工具结果如何改变你的判断，再决定下一步。不要让读取或搜索结果悬空。',
+      summary: 'The previous tool result has not entered the downstream decision chain; there is a dead step risk.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Before continuing, state how the previous result bears on the current goal.',
+      prompt: 'First explain how the previous tool result changed your judgement, then decide the next step. Do not leave read or search results dangling.',
       shouldBlock: this.shouldBlock(context),
       tags: ['tools', 'usage', 'decision'],
     };
@@ -117,9 +117,9 @@ class DuplicateStepPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '检测到重复步骤，当前操作与最近一次同类动作高度重合。',
-      suggestion: this.defaultSuggestion(context.issue) || '复用已有结果，或扩大目标范围，而不是重复执行相同步骤。',
-      prompt: '不要重复执行同一步。请复用最近结果，或明确指出自上次以来发生了什么变化。',
+      summary: 'Detected a duplicate step; the current operation overlaps heavily with the most recent action of the same kind.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Reuse the existing result or widen the target scope, instead of executing the same step again.',
+      prompt: 'Do not execute the same step again. Reuse the most recent result, or state explicitly what has changed since last time.',
       shouldBlock: this.shouldBlock(context),
       tags: ['tools', 'duplicate', 'reuse'],
     };
@@ -132,9 +132,9 @@ class WrapperWorkflowPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '当前 subagent 更像包装层，没有带来实质性增量。',
-      suggestion: this.defaultSuggestion(context.issue) || '把简单透传逻辑折叠回主线程，或要求 agent 负责验证与聚合。',
-      prompt: '若这个子代理仅在透传输入，请停止继续派生相同模式，并把任务收敛成主线程内的直接工具调用。',
+      summary: 'The current subagent behaves more like a wrapper layer and adds no substantive value.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Fold simple pass-through logic back into the main thread, or make the agent responsible for validation and aggregation.',
+      prompt: 'If this subagent only passes its input through, stop spawning the same pattern and converge the task into a direct tool call in the main thread.',
       shouldBlock: this.shouldBlock(context),
       tags: ['workflow', 'agent', 'wrapper'],
     };
@@ -147,9 +147,9 @@ class ContextCouplingPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '多个执行线程在同一代码邻域来回切换，耦合度过高。',
-      suggestion: this.defaultSuggestion(context.issue) || '按文件簇或符号所有权切分任务，先完成局部闭环再切换线程。',
-      prompt: '请重新划分线程边界：每个 worker 只负责清晰的文件或符号集合，避免上下文在多个线程间回流。',
+      summary: 'Multiple execution threads keep switching back and forth within the same code neighborhood; coupling is too high.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Split the task by file cluster or symbol ownership, and close one local loop before switching threads.',
+      prompt: 'Redraw the thread boundaries: each worker should own a clearly defined set of files or symbols, so that context does not flow back and forth between threads.',
       shouldBlock: this.shouldBlock(context),
       tags: ['workflow', 'coupling', 'ownership'],
     };
@@ -162,9 +162,9 @@ class LongChainPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '任务链已过长，需要建立检查点并收敛目标。',
-      suggestion: this.defaultSuggestion(context.issue) || '先总结已完成项与未完成项，再只推进一个子问题。',
-      prompt: '请先给出检查点：已完成、待完成、下一步唯一目标。没有检查点时不要继续扩展链路。',
+      summary: 'The task chain is already too long; establish a checkpoint and converge the goal.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Summarize what is done and what is outstanding first, then advance only one subproblem.',
+      prompt: 'Provide a checkpoint first: what is done, what is pending, and the single goal of the next step. Do not extend the chain further without a checkpoint.',
       shouldBlock: this.shouldBlock(context),
       tags: ['workflow', 'checkpoint', 'chain-length'],
     };
@@ -177,9 +177,9 @@ class InconsistentToolInterfacePlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '相近工具接口不一致，存在误用风险。',
-      suggestion: this.defaultSuggestion(context.issue) || '在切换工具前显式声明参数映射和结果字段，不要凭习惯假定接口一致。',
-      prompt: '在继续之前，请明确本次工具的输入字段、输出字段和成功判据，避免把上一工具的接口假设直接迁移过来。',
+      summary: 'Similar tools expose inconsistent interfaces, creating a risk of misuse.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Declare the parameter mapping and result fields explicitly before switching tools; do not assume the interfaces match out of habit.',
+      prompt: 'Before continuing, state the input fields, output fields, and success criteria of this tool, so that interface assumptions from the previous tool are not carried over.',
       shouldBlock: this.shouldBlock(context),
       tags: ['tools', 'interface', 'schema'],
     };
@@ -192,9 +192,9 @@ class WeakToolPlanner extends BasePlanner {
 
   protected createPlan(context: BenchmarkPlannerContext): BenchmarkPlan {
     return {
-      summary: '当前任务存在更适配的工具选择，正在走弱工具路径。',
-      suggestion: this.defaultSuggestion(context.issue) || '优先使用更强的搜索、AST 或结构化工具，而不是手工遍历。',
-      prompt: '请优先选择信息密度更高、结构化程度更强的工具，不要继续依赖低效替代路径。',
+      summary: 'A better-suited tool exists for the current task; the present path relies on a weak tool.',
+      suggestion: this.defaultSuggestion(context.issue) || 'Prefer stronger search, AST, or structured tools over manual traversal.',
+      prompt: 'Prefer tools with higher information density and stronger structure; do not keep relying on an inefficient substitute path.',
       shouldBlock: this.shouldBlock(context),
       tags: ['tools', 'selection', 'capability'],
     };

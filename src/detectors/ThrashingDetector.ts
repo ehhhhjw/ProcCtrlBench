@@ -9,8 +9,8 @@ import { writePrewarn } from '../utils/Prewarn';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 上下文窗口抖动检测器
- * 检测刚读取大量信息便立即压缩，信息未充分利用
+ * Context window thrashing detector
+ * Detects compression triggered immediately after a large read, leaving the information underused
  */
 export class ThrashingDetector implements IDetector {
   readonly name = 'ThrashingDetector';
@@ -40,29 +40,29 @@ export class ThrashingDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 获取所有消息按时间排序
+    // Get all messages sorted by time
     const messages = Array.from(this.sessionData.messages.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
 
-      // 计算此步骤前后的上下文token数
+      // Compute the context token counts before and after this step
       const { tokensBefore, tokensAfter } = this.contextChains.getContextTokenStats(message.uuid);
 
-      // 检查是否接近窗口上限
+      // Check whether the window limit is being approached
       const windowThreshold = this.config.contextWindowSize * this.config.thresholds.thrashing.windowThreshold;
 
-      // 预警：接近窗口阈值（75%）前的边界
+      // Prewarn: the boundary just before the window threshold (75%)
       if (tokensAfter > windowThreshold * 0.95) {
         writePrewarn({
           metric: 'contextThrashing',
-          message: `上下文使用接近阈值: ${(tokensAfter / this.config.contextWindowSize * 100).toFixed(1)}%`,
+          message: `Context usage near threshold: ${(tokensAfter / this.config.contextWindowSize * 100).toFixed(1)}%`,
           details: { step: i, tokensAfter },
         });
       }
       if (tokensAfter > windowThreshold) {
-        // 检查后续步骤是否有压缩
+        // Check whether compression occurs in subsequent steps
         const nextSteps = this.contextChains.getFutureContextMessages(
           message.uuid,
           this.config.thresholds.thrashing.compressionLookAhead
@@ -70,7 +70,7 @@ export class ThrashingDetector implements IDetector {
         const compressionDelay = this.findCompressionDelay(nextSteps);
 
         if (compressionDelay >= 0) {
-          // 发现了抖动
+          // Thrashing found
           const payloadSize = tokensAfter - tokensBefore;
           const windowCapacity = this.config.contextWindowSize - tokensBefore;
           const payloadFootprint = this.getPayloadFootprint(message);
@@ -82,16 +82,16 @@ export class ThrashingDetector implements IDetector {
             continue;
           }
 
-          // 判断类型
+          // Determine the type
           let thrashingType: 'timing_fault' | 'payload_oversize_fault';
           let severity: Severity;
 
           if (payloadSize < windowCapacity * 0.5) {
-            // Timing Fault: 压缩时机太晚
+            // Timing Fault: compression happened too late
             thrashingType = 'timing_fault';
             severity = Severity.Warning;
           } else {
-            // Payload Oversize Fault: 单个对象过大
+            // Payload Oversize Fault: a single object is too large
             thrashingType = 'payload_oversize_fault';
             severity = Severity.Warning;
           }
@@ -101,14 +101,14 @@ export class ThrashingDetector implements IDetector {
           issues.push({
             metric: 'contextThrashing',
             severity,
-            message: `检测到上下文窗口抖动 (${thrashingType}): 步骤${i}添加${payloadSize} tokens后，在${compressionDelay}步后触发压缩`,
+            message: `Detected context window thrashing (${thrashingType}): step ${i} added ${payloadSize} tokens, and compression was triggered ${compressionDelay} steps later`,
             location: {
               stepRange: [i, i + compressionDelay],
               messageUuid: message.uuid,
             },
             suggestion: thrashingType === 'timing_fault'
-              ? `应在接近窗口上限前及时压缩，避免突发性超限`
-              : `单次添加的内容过大 (${payloadSize} tokens)，考虑分批处理或提前摘要`,
+              ? `Compress in time before nearing the window limit, to avoid abrupt overruns`
+              : `The content added in a single step is too large (${payloadSize} tokens); consider processing it in batches or summarizing it beforehand`,
             evidence: {
               type: 'medium',
               details: {
@@ -134,13 +134,13 @@ export class ThrashingDetector implements IDetector {
   }
 
   /**
-   * 查找压缩延迟
+   * Find the compression delay
    */
   private findCompressionDelay(nextSteps: MessageNode[]): number {
     for (let i = 0; i < nextSteps.length; i++) {
       const message = nextSteps[i];
 
-      // 检查是否有content-replacement
+      // Check whether there is a content-replacement
       const replacements: ContentReplacementRecord[] = [];
       for (const replacement of this.sessionData.replacements.values()) {
         if (replacement.messageId === message.messageId) {
@@ -149,10 +149,10 @@ export class ThrashingDetector implements IDetector {
       }
 
       if (replacements.length > 0) {
-        return i + 1; // 返回步骤数
+        return i + 1; // Return the number of steps
       }
 
-      // 检查token使用是否突然下降（表示压缩发生）
+      // Check whether token usage drops sharply (indicating that compression occurred)
       if (i > 0 && message.usage) {
         const prevMessage = nextSteps[i - 1];
 
@@ -160,7 +160,7 @@ export class ThrashingDetector implements IDetector {
           const currentTotal = message.usage.input_tokens + message.usage.output_tokens;
           const prevTotal = prevMessage.usage.input_tokens + prevMessage.usage.output_tokens;
 
-          // 如果token数下降超过20%
+          // If the token count drops by more than 20%
           if (currentTotal < prevTotal * 0.8) {
             return i + 1;
           }
@@ -168,7 +168,7 @@ export class ThrashingDetector implements IDetector {
       }
     }
 
-    return -1; // 未发现压缩
+    return -1; // No compression found
   }
 
   private getPayloadFootprint(message: MessageNode): CodeFootprint {

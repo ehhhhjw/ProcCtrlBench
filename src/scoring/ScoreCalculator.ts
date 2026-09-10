@@ -441,19 +441,19 @@ export class ScoreCalculator {
 
     const evidence: string[] = [];
     if (evidenceCoverage < 0.7) {
-      evidence.push('部分风险 finding 缺少结构化证据，降低了可理解性。');
+      evidence.push('Some risk findings lack structured evidence, which reduces interpretability.');
     }
     if (verificationRate < 0.6) {
-      evidence.push('修改后验证覆盖不足，可修正性偏弱。');
+      evidence.push('Post-modification verification coverage is insufficient, so correctability is weak.');
     }
     if (this.dimensionMaxRisk(risk, 'workflowArchitecture') >= this.config.riskModel.warningThreshold) {
-      evidence.push('工作流架构维度风险偏高，回退与分段治理成本上升。');
+      evidence.push('Risk in the workflow architecture dimension is high, raising the cost of rollback and staged control.');
     }
     if (warningExposureRate >= 0.5) {
-      evidence.push('大部分高风险模式能够以 warning 形式提前暴露，保留了部分干预入口。');
+      evidence.push('Most high-risk patterns can be exposed early as warnings, which preserves some intervention points.');
     }
     if (evidence.length === 0) {
-      evidence.push('当前轨迹具备基础可观察性和验证覆盖，控制保持状态稳定。');
+      evidence.push('The current trajectory has basic observability and verification coverage, and control preservation is stable.');
     }
 
     return {
@@ -483,7 +483,7 @@ export class ScoreCalculator {
     if (highRiskMetrics.has('ghostContext') || highRiskMetrics.has('thrashing') || highRiskMetrics.has('oversizedRules')) {
       actions.push({
         type: 'summarize-context',
-        reason: '上下文负载风险偏高，优先做摘要/压缩，避免继续挤压窗口。',
+        reason: 'Context load risk is high; summarize/compress first to avoid squeezing the window further.',
         triggeredBy: [...highRiskMetrics].filter(metric =>
           ['ghostContext', 'thrashing', 'oversizedRules'].includes(metric)
         ),
@@ -493,7 +493,7 @@ export class ScoreCalculator {
     if (highRiskMetrics.has('toolCallChain') || highRiskMetrics.has('duplicateStep') || highRiskMetrics.has('deadStep')) {
       actions.push({
         type: 'verify-before-next-step',
-        reason: '工具效率维度已出现高风险模式，下一步前先核验状态，避免空转与重复调用。',
+        reason: 'High-risk patterns have appeared in the tool efficiency dimension; verify state before the next step to avoid spinning and repeated calls.',
         triggeredBy: [...highRiskMetrics].filter(metric =>
           ['toolCallChain', 'duplicateStep', 'deadStep'].includes(metric)
         ),
@@ -503,7 +503,7 @@ export class ScoreCalculator {
     if (highRiskMetrics.has('longChain') || highRiskMetrics.has('contextCoupling') || highRiskMetrics.has('wrapperWorkflow')) {
       actions.push({
         type: 'create-checkpoint',
-        reason: '工作流结构风险偏高，应切分子任务并建立 checkpoint 再继续。',
+        reason: 'Workflow structure risk is high; split into subtasks and establish a checkpoint before continuing.',
         triggeredBy: [...highRiskMetrics].filter(metric =>
           ['longChain', 'contextCoupling', 'wrapperWorkflow'].includes(metric)
         ),
@@ -513,7 +513,7 @@ export class ScoreCalculator {
     if (risk.overallRisk >= this.config.riskModel.errorThreshold && controlPreservation.score < 0.55) {
       actions.push({
         type: 'request-confirmation',
-        reason: '总体风险高且控制保持偏弱，应暂停自治推进并暴露关键分支给上层判断。',
+        reason: 'Overall risk is high and control preservation is weak; pause autonomous progress and expose critical branches for higher-level review.',
         triggeredBy: topFindings.map(finding => finding.metric),
       });
     }
@@ -521,7 +521,7 @@ export class ScoreCalculator {
     if (risk.overallRisk >= 0.9 || (risk.errorFindings >= 2 && controlPreservation.level === 'fragile')) {
       actions.push({
         type: 'handoff',
-        reason: '高风险 finding 已堆叠且回退能力不足，建议转为人工接管或更强监督模式。',
+        reason: 'High-risk finding instances have accumulated and rollback capacity is insufficient; use human control or stronger supervision.',
         triggeredBy: topFindings.map(finding => finding.metric),
       });
     }
@@ -529,7 +529,7 @@ export class ScoreCalculator {
     if (actions.length === 0) {
       actions.push({
         type: 'continue',
-        reason: '当前过程风险和控制保持处于可接受范围，可以继续自治推进。',
+        reason: 'Process risk and control preservation are acceptable; autonomous progress can continue.',
         triggeredBy: [],
       });
     }
@@ -605,7 +605,7 @@ export class ScoreCalculator {
       taskOutcome.taskCompletionRate >= 0.8 &&
       taskOutcome.outputExecutability >= 0.75
     ) {
-      strengths.push('任务完成质量稳定');
+      strengths.push('Task completion quality is consistent');
     }
 
     if (
@@ -613,7 +613,7 @@ export class ScoreCalculator {
       dimensionResults.contextManagement.errors === 0 &&
       dimensionResults.contextManagement.warnings <= 1
     ) {
-      strengths.push('上下文管理良好');
+      strengths.push('Context management is effective');
     }
 
     if (
@@ -621,15 +621,15 @@ export class ScoreCalculator {
       dimensionResults.toolUseEfficiency.errors === 0 &&
       dimensionResults.toolUseEfficiency.warnings <= 1
     ) {
-      strengths.push('工具使用效率高');
+      strengths.push('Tool use is efficient');
     }
 
     if (diagnostics.filter(d => d.metric === 'duplicateStep').length === 0) {
-      strengths.push('无重复步骤');
+      strengths.push('No duplicate steps');
     }
 
     if (diagnostics.filter(d => d.metric === 'toolCallChain' && d.severity === Severity.Error).length === 0) {
-      strengths.push('工具调用链合理');
+      strengths.push('Tool call chains are well structured');
     }
 
     return strengths;

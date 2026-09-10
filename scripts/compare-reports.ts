@@ -87,10 +87,10 @@ function main() {
   ];
 
   const lines: string[] = [];
-  lines.push('# 对比汇总');
-  lines.push(`样本数: before=${before.length}, after=${after.length}`);
+  lines.push('# Comparison Summary');
+  lines.push(`Sample size: before=${before.length}, after=${after.length}`);
   lines.push('');
-  lines.push('| 指标 | before均值[95%CI] | after均值[95%CI] | Cohen d |');
+  lines.push('| Metric | before mean [95% CI] | after mean [95% CI] | Cohen d |');
   lines.push('|---|---|---|---|');
   for (const metric of metrics) {
     const bvals = pickMetric(before, metric.select);

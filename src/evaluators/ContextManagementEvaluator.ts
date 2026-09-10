@@ -6,34 +6,34 @@ import { ThrashingDetector } from '../detectors/ThrashingDetector';
 import { OversizedRulesDetector } from '../detectors/OversizedRulesDetector';
 
 /**
- * 上下文管理评估器
+ * Context management evaluator
  */
 export class ContextManagementEvaluator extends BaseEvaluator {
   readonly name = 'ContextManagementEvaluator';
-  readonly description = '评估上下文管理能力，包括幽灵上下文、规则膨胀和上下文抖动';
+  readonly description = 'Evaluates context management capability, covering ghost context, rule bloat and context thrashing';
 
   async evaluate(): Promise<EvaluationResult> {
     const allIssues: DetectionIssue[] = [];
 
-    // 运行Ghost Context检测器
+    // Run the Ghost Context detector
     const ghostContextDetector = new GhostContextDetector(this.sessionData, this.config);
     const ghostContextIssues = await ghostContextDetector.detect();
     allIssues.push(...ghostContextIssues);
 
-    // 运行Thrashing检测器
+    // Run the Thrashing detector
     const thrashingDetector = new ThrashingDetector(this.sessionData, this.config);
     const thrashingIssues = await thrashingDetector.detect();
     allIssues.push(...thrashingIssues);
 
-    // 运行Oversized Rules检测器
+    // Run the Oversized Rules detector
     const oversizedRulesDetector = new OversizedRulesDetector(this.sessionData, this.config);
     const oversizedRulesIssues = await oversizedRulesDetector.detect();
     allIssues.push(...oversizedRulesIssues);
 
-    // 统计问题
+    // Count issues
     const issueStats = this.calculateIssueStats(allIssues);
 
-    // 构建详细信息
+    // Build the details payload
     const details = this.buildDetails(allIssues);
 
     return {
@@ -46,7 +46,7 @@ export class ContextManagementEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 构建详细信息
+   * Builds the details payload
    */
   private buildDetails(issues: DetectionIssue[]): Record<string, any> {
     const ghostContextIssues = issues.filter(i => i.metric === 'ghostContext');

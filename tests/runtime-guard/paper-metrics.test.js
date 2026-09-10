@@ -24,7 +24,7 @@ test('averagePrecision and auroc reach 1 under perfect separation', () => {
 });
 
 test('auroc matches the Mann-Whitney closed form on interleaved scores', () => {
-  // 正例分数排名为 4 和 2 -> (6 - 2*3/2) / (2*2) = 0.75
+  // Positive scores rank 4 and 2 -> (6 - 2*3/2) / (2*2) = 0.75
   const value = auroc([true, false, true, false], [0.9, 0.8, 0.7, 0.6]);
   assert.ok(Math.abs(value - 0.75) < EPS, `expected 0.75, got ${value}`);
 });
@@ -35,7 +35,7 @@ test('auroc is 0 under perfect inversion and 0.5 under full ties', () => {
 });
 
 test('averagePrecision matches the stepwise PR definition', () => {
-  // 降序为 [pos, neg, pos, neg]: 精确率 1/1 与 2/3
+  // Descending order is [pos, neg, pos, neg]: precision 1/1 and 2/3
   const expected = (1 + 2 / 3) / 2;
   const value = averagePrecision([true, false, true, false], [0.9, 0.8, 0.7, 0.6]);
   assert.ok(Math.abs(value - expected) < EPS, `expected ${expected}, got ${value}`);
@@ -49,7 +49,7 @@ test('auroc and averagePrecision degrade to 0 when a class is missing', () => {
 test('cohensKappa is 0 at chance agreement and 1 at full agreement', () => {
   assert.ok(Math.abs(cohensKappa([true, true, false, false], [true, false, true, false])) < EPS);
   assert.ok(Math.abs(cohensKappa([true, false, true, false], [true, false, true, false]) - 1) < EPS);
-  // 两人都判全否：无变异但完全一致，按约定记为 1
+  // Both raters label every item false: no variation but full agreement, defined as 1.
   assert.equal(cohensKappa([false, false], [false, false]), 1);
 });
 
@@ -95,7 +95,7 @@ test('computeAgreementStats reports raw agreement, exemption and adjudication ra
 });
 
 test('compareCalibration favours posterior risk over hard thresholding', () => {
-  // 触发即判定为 1，但实际只有一半为真 -> hard 分支被严重高估
+  // Every trigger is scored as 1, but only half are true -> the hard branch is severely overestimated.
   const samples = [
     { label: true, triggered: true, posteriorRisk: 0.5 },
     { label: false, triggered: true, posteriorRisk: 0.5 },
@@ -163,6 +163,6 @@ test('bootstrapRankStability respects stratum boundaries when resampling', () =>
     },
   ];
   const rows = bootstrapRankStability(inputs, { replicates: 50, rng: createSeededRng(11) });
-  // 每层各重采样 2 个样本，均值恒为 (1 + 0) / 2
+  // Resample two items per stratum; the mean is always (1 + 0) / 2.
   assert.ok(Math.abs(rows[0].meanScore - 0.5) < EPS, `meanScore=${rows[0].meanScore}`);
 });

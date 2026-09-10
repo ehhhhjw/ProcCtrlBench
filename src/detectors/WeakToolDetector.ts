@@ -8,8 +8,8 @@ import { writePrewarn } from '../utils/Prewarn';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 弱工具检测器
- * 检测在适用场景调用率偏低的工具
+ * Weak tool detector
+ * Detects tools with a low invocation rate in applicable scenarios
  */
 export class WeakToolDetector implements IDetector {
   readonly name = 'WeakToolDetector';
@@ -19,7 +19,7 @@ export class WeakToolDetector implements IDetector {
   private projectAst?: ProjectAstLoader;
   private codeContext: CodeContextAnalyzer;
 
-  // 工具适用性映射：定义每个工具适用的任务类型
+  // Tool suitability mapping: defines the task types each tool is applicable to
   private readonly toolSuitability: Map<string, string[]> = new Map([
     ['Glob', ['file_search']],
     ['Grep', ['file_search', 'code_search']],
@@ -32,7 +32,7 @@ export class WeakToolDetector implements IDetector {
     ['WebFetch', ['web_fetch', 'web_search']],
   ]);
 
-  // 工具的替代关系
+  // Alternative relationships between tools
   private readonly toolAlternatives: Map<string, string[]> = new Map([
     ['Grep', ['Read', 'Bash']],
     ['Glob', ['Bash', 'Read']],
@@ -59,49 +59,49 @@ export class WeakToolDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 收集工具使用统计
+    // Collect tool usage statistics
     const toolUsage = this.collectToolUsage();
 
-    // 推断任务类型
+    // Infer task types
     const taskTypes = this.inferTaskTypes();
 
-    // 对每个工具检查其在适用场景的调用率
+    // For each tool, check its invocation rate in applicable scenarios
     for (const [tool, suitableTaskTypes] of this.toolSuitability.entries()) {
-      // 计算该工具适用的任务数量
+      // Count the tasks this tool is applicable to
       const suitableTaskCount = suitableTaskTypes.reduce(
         (count, taskType) => count + (taskTypes.get(taskType) || 0),
         0
       );
 
       if (suitableTaskCount >= 3) {
-        // 如果有足够多的适用任务
+        // If there are enough applicable tasks
         const actualCallCount = toolUsage.get(tool) || 0;
         const callRate = actualCallCount / suitableTaskCount;
 
-        // 接近阈值的预警，提示改进工具可发现性
+        // Prewarn when near threshold, hinting at improved tool discoverability
         if (callRate < 0.35 && callRate >= 0.3) {
           writePrewarn({
             metric: 'weakTool',
-            message: `工具调用率接近阈值: ${tool} ${(callRate * 100).toFixed(0)}%`,
+            message: `Tool invocation rate near threshold: ${tool} ${(callRate * 100).toFixed(0)}%`,
             details: { suitableTaskCount, actualCallCount },
           });
         }
         if (callRate < 0.3) {
-          // 调用率低于30%
+          // Invocation rate below 30%
           const severity = callRate < 0.15 ? Severity.Error : Severity.Warning;
           const deduction = severity === Severity.Error ? 2.0 : 1.0;
 
-          // 检查是否被替代工具大量使用
+          // Check whether alternative tools are used heavily instead
           const alternatives = this.checkAlternativeUsage(tool, toolUsage);
 
           issues.push({
             metric: 'weakTool',
             severity,
-            message: `检测到弱工具: ${tool} 在 ${suitableTaskCount} 个适用任务中仅被调用 ${actualCallCount} 次 (${(callRate * 100).toFixed(0)}%)`,
+            message: `Weak tool detected: ${tool} in ${suitableTaskCount} applicable tasks was invoked only ${actualCallCount} times (${(callRate * 100).toFixed(0)}%)`,
             location: {},
             suggestion: alternatives.length > 0
-              ? `${tool}工具可发现性低，可能被${alternatives.map(a => a.name).join(', ')}替代。考虑改进工具描述或提示`
-              : `${tool}工具可发现性低。考虑改进工具描述、增加使用示例、或在适当时机主动提示`,
+              ? `The ${tool} tool has low discoverability and may be replaced by ${alternatives.map(a => a.name).join(', ')}. Consider improving the tool description or prompt`
+              : `The ${tool} tool has low discoverability. Consider improving the tool description, adding usage examples, or proactively prompting at the right moment`,
             evidence: {
               type: severity === Severity.Error ? 'strong' : 'medium',
               details: {
@@ -122,7 +122,7 @@ export class WeakToolDetector implements IDetector {
   }
 
   /**
-   * 收集工具使用统计
+   * Collects tool usage statistics
    */
   private collectToolUsage(): Map<string, number> {
     const usage = new Map<string, number>();
@@ -135,12 +135,12 @@ export class WeakToolDetector implements IDetector {
   }
 
   /**
-   * 推断任务类型
+   * Infers task types
    */
   private inferTaskTypes(): Map<string, number> {
     const taskTypes = new Map<string, number>();
 
-    // 分析工具调用模式来推断任务
+    // Analyze tool invocation patterns to infer tasks
     for (const toolUse of Array.from(this.sessionData.toolUses.values()).sort((a, b) => a.timestamp - b.timestamp)) {
       const inferredTasks = this.inferTaskFromToolUse(toolUse);
 
@@ -153,7 +153,7 @@ export class WeakToolDetector implements IDetector {
   }
 
   /**
-   * 从工具调用推断���务类型
+   * Infers the task type from a tool invocation
    */
   private inferTaskFromToolUse(toolUse: ToolUseInfo): string[] {
     const tasks = new Set<string>();
@@ -177,7 +177,7 @@ export class WeakToolDetector implements IDetector {
         break;
 
       case 'Bash':
-        // 根据命令内容推断
+        // Infer from the command content
         const command = toolUse.input.command || '';
         if (command.includes('find') || command.includes('ls')) {
           tasks.add('file_search');
@@ -231,7 +231,7 @@ export class WeakToolDetector implements IDetector {
   }
 
   /**
-   * 检查替代工具的使用情况
+   * Checks the usage of alternative tools
    */
   private checkAlternativeUsage(
     tool: string,
@@ -245,7 +245,7 @@ export class WeakToolDetector implements IDetector {
     for (const altName of alternativeNames) {
       const altCallCount = toolUsage.get(altName) || 0;
 
-      // 如果替代工具的调用次数是原工具的2倍以上
+      // If the alternative tool is invoked more than twice as often as the original tool
       if (altCallCount > toolCallCount * 2) {
         alternatives.push({
           name: altName,

@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 
 /**
- * 读取外部生成的文件关联图谱 JSON。
- * JSON 结构示例：{ "src/a.ts": ["src/b.ts","src/c.ts"], ... }
+ * Loads an externally generated file association graph in JSON form.
+ * Example JSON structure: { "src/a.ts": ["src/b.ts","src/c.ts"], ... }
  */
 export class FileAssociationLoader {
   private associations: Map<string, string[]> = new Map();
@@ -16,12 +16,12 @@ export class FileAssociationLoader {
     this.associations = new Map(Object.entries(obj));
   }
 
-  /** 获取文件的核心关联集合（若无则返回空数组） */
+  /** Returns the core association set for a file (an empty array if none) */
   get(filePath: string): string[] {
     return this.associations.get(filePath) || [];
   }
 
-  /** 检查两个文件是否存在核心关联 */
+  /** Checks whether a core association exists between two files */
   isAssociated(a: string, b: string): boolean {
     const list = this.get(a);
     return list.includes(b);

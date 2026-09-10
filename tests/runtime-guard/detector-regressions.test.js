@@ -394,7 +394,7 @@ test('ghostContext ignores sibling chatter when deciding whether a summarized re
     (issue) =>
       issue.metric === 'ghostContext' &&
       issue.location?.messageUuid === 'm-read-large' &&
-      String(issue.message || '').includes('未被引用的历史结果')
+      String(issue.message || '').includes('unreferenced historical result')
   );
 
   assert.ok(ghostIssue);
@@ -460,7 +460,7 @@ test('contextCoupling ignores package-domain noise when all steps stay on the sa
     issues.some(
       (issue) =>
         issue.metric === 'contextCoupling' &&
-        String(issue.message || '').includes('代码上下文耦合')
+        String(issue.message || '').includes('code context coupling')
     ),
     false
   );

@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-// 将当前 output/evaluation-reports 中的报告复制到 before/after 目录，模拟一次整改前/后对比。
-// 用法：
-//  1) 先跑一遍评估产生 baseline 报告 → prepare-before-after baseline
-//  2) 再跑一次评估产生 after 报告（或复制合成）→ prepare-before-after after
+// Copy the reports currently in output/evaluation-reports into the before/after directories,
+// simulating a before/after remediation comparison.
+// Usage:
+//  1) Run an evaluation first to produce the baseline report -> prepare-before-after baseline
+//  2) Run another evaluation to produce the after report (or synthesize it by copying) -> prepare-before-after after
 
 function copyAll(srcDir: string, dstDir: string) {
   fs.mkdirSync(dstDir, { recursive: true });

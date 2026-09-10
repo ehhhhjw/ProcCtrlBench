@@ -38,16 +38,16 @@ async function main() {
   const det = new LongChainDetector(s, DEFAULT_EVALUATION_CONFIG);
   await det.detect();
   if (!fs.existsSync(prewarn)) {
-    console.error('未产生 LongChain 接近阈值的预警');
+    console.error('No near-threshold prewarn produced for LongChain');
     process.exit(1);
   }
   const arr = JSON.parse(fs.readFileSync(prewarn,'utf-8'));
-  const hit = arr.some((x:any)=> x.metric==='longChain' && String(x.message||'').includes('接近'));
+  const hit = arr.some((x:any)=> x.metric==='longChain' && String(x.message||'').includes('near'));
   if (!hit) {
-    console.error('未发现 LongChain 接近阈值预警记录');
+    console.error('No near-threshold prewarn record found for LongChain');
     process.exit(1);
   }
-  console.log('[ok] longchain-prewarn: 接近阈值预警生效');
+  console.log('[ok] longchain-prewarn: near-threshold prewarn fired');
 }
 
 main().catch(e=>{ console.error(e); process.exit(1); });
