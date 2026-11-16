@@ -1,67 +1,67 @@
 #!/bin/bash
 
-echo "=== Agent评估系统安装脚本 ==="
+echo "=== Agent Evaluation System Setup Script ==="
 echo ""
 
-# 检查Node.js
+# Check Node.js
 if ! command -v node &> /dev/null; then
-    echo "❌ Node.js未安装，请先安装Node.js >= 16"
+    echo "❌ Node.js is not installed. Please install Node.js >= 16 first"
     exit 1
 fi
 
-echo "✅ Node.js版本: $(node --version)"
+echo "✅ Node.js version: $(node --version)"
 
-# 检查npm
+# Check npm
 if ! command -v npm &> /dev/null; then
-    echo "❌ npm未安装"
+    echo "❌ npm is not installed"
     exit 1
 fi
 
-echo "✅ npm版本: $(npm --version)"
+echo "✅ npm version: $(npm --version)"
 echo ""
 
-# 清理npm缓存(如果遇到问题)
-echo "清理npm缓存..."
+# Clean the npm cache (in case of problems)
+echo "Cleaning npm cache..."
 npm cache clean --force 2>/dev/null || true
 
-# 安装根目录依赖
-echo "安装项目依赖..."
+# Install root directory dependencies
+echo "Installing project dependencies..."
 npm install --legacy-peer-deps || npm install --force || {
-    echo "⚠️  npm install失败,尝试使用yarn..."
+    echo "⚠️  npm install failed, trying yarn instead..."
     if command -v yarn &> /dev/null; then
         yarn install
     else
-        echo "❌ 安装失败。请手动运行: npm install --legacy-peer-deps"
+        echo "❌ Install failed. Please run manually: npm install --legacy-peer-deps"
         exit 1
     fi
 }
 
-# 安装ClaudeCodeStructure依赖
+# Install ClaudeCodeStructure dependencies
 echo ""
-echo "安装ClaudeCodeStructure依赖..."
+echo "Installing ClaudeCodeStructure dependencies..."
 cd ClaudeCodeStructure
 npm install --legacy-peer-deps || npm install --force || {
-    echo "⚠️  ClaudeCodeStructure依赖安装失败"
+    echo "⚠️  Failed to install ClaudeCodeStructure dependencies"
 }
 cd ..
 
-# 编译TypeScript
+# Build TypeScript
 echo ""
-echo "编译TypeScript..."
+echo "Building TypeScript..."
 if npx tsc --version &> /dev/null; then
     npm run build || {
-        echo "⚠️  TypeScript编译失败，可能是因为依赖未完全安装"
-        echo "请手动运行: npm run build"
+        echo "⚠️  TypeScript build failed, possibly because dependencies were not fully installed"
+        echo "Please run manually: npm run build"
     }
 else
-    echo "⚠️  TypeScript编译器未找到，跳过编译"
+    echo "⚠️  TypeScript compiler not found, skipping build"
 fi
 
 echo ""
-echo "=== 安装完成 ==="
+echo "=== Install Complete ==="
 echo ""
-echo "下一步:"
-echo "1. 运行示例: npm run example"
-echo "2. 查看文档: cat README.md"
-echo "3. 快速开始: cat QUICKSTART.md"
+echo "Next steps:"
+echo "1. Run the example: npm run example"
+echo "2. Read the docs: cat README.md"
+echo "3. Quick start: cat QUICKSTART.md"
 echo ""

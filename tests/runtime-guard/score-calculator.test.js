@@ -29,9 +29,9 @@ test('ScoreCalculator emits findings, risk summary, control preservation and exe
           {
             metric: 'ghostContext',
             severity: Severity.Warning,
-            message: '摘要后原文仍长期驻留',
+            message: 'original content persists after summarization',
             deduction: 1.2,
-            suggestion: '压缩原文并只保留结构化摘要',
+            suggestion: 'Compress the original content and keep only a structured summary',
             evidence: {
               type: 'strong',
               details: {
@@ -55,9 +55,9 @@ test('ScoreCalculator emits findings, risk summary, control preservation and exe
           {
             metric: 'deadStep',
             severity: Severity.Error,
-            message: '执行结果没有进入后续决策链',
+            message: 'execution result never feeds the downstream decision chain',
             deduction: 2.1,
-            suggestion: '在下一步明确消费该结果或删除这一步',
+            suggestion: 'Explicitly consume this result in the next step, or remove the step',
             evidence: {
               type: 'medium',
               details: {
@@ -81,9 +81,9 @@ test('ScoreCalculator emits findings, risk summary, control preservation and exe
           {
             metric: 'longChain',
             severity: Severity.Warning,
-            message: '链路过长且缺少检查点',
+            message: 'chain too long and missing checkpoints',
             deduction: 1.5,
-            suggestion: '切分子任务并增加 checkpoint',
+            suggestion: 'Split the work into subtasks and add a checkpoint',
             evidence: {
               type: 'strong',
               details: {

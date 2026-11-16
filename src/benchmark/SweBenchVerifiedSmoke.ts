@@ -55,9 +55,9 @@ export interface InstanceValidationSummary {
 }
 
 /**
- * 按顺序探测可用的 Python 解释器。
- * SWE-bench-Verified 的多数任务需要 3.10，若你的解释器不在 PATH 上，
- * 用 PROCCTRL_PYTHON_BIN 指定绝对路径。
+ * Probe the candidates in order for an available Python interpreter.
+ * Most SWE-bench-Verified tasks require 3.10; if your interpreter is not on PATH,
+ * use PROCCTRL_PYTHON_BIN to point at an absolute path.
  */
 const DEFAULT_PYTHON_BIN_CANDIDATES = [
   ...(process.env.PROCCTRL_PYTHON_BIN ? [process.env.PROCCTRL_PYTHON_BIN] : []),

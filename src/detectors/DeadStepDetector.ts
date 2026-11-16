@@ -9,8 +9,8 @@ import { ContextChainAnalyzer } from '../analyzers/ContextChainAnalyzer';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 死步骤检测器
- * 检测某步骤的结果未被后续流程有效引用
+ * Dead step detector
+ * Detects steps whose results are never effectively referenced by the subsequent flow
  */
 export class DeadStepDetector implements IDetector {
   readonly name = 'DeadStepDetector';
@@ -24,7 +24,7 @@ export class DeadStepDetector implements IDetector {
   constructor(sessionData: SessionData, config: EvaluationConfig) {
     this.sessionData = sessionData;
     this.config = config;
-    // 尝试加载文件图谱（可选）
+    // Try to load the file graph (optional)
     try {
       const graphPath = require('path').join(process.cwd(), 'output/file-graph.json');
       this.fileGraph = new FileAssociationLoader(graphPath);
@@ -39,7 +39,7 @@ export class DeadStepDetector implements IDetector {
     } catch (e) {
       this.projectAst = undefined;
     }
-    // 初始化AST分析器（可选）
+    // Initialize the AST analyzer (optional)
     this.ast = new AstAnalyzer();
     this.ast.init().catch(() => { /* ignore */ });
     this.contextChains = new ContextChainAnalyzer(this.sessionData);
@@ -48,7 +48,7 @@ export class DeadStepDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 获取按时间排序的所有工具调用
+    // Get all tool invocations sorted by time
     const toolUses = Array.from(this.sessionData.toolUses.values())
       .sort((a, b) => a.timestamp - b.timestamp);
     const orderedMessages = Array.from(this.sessionData.messages.values())
@@ -58,12 +58,12 @@ export class DeadStepDetector implements IDetector {
       const toolUse = toolUses[i];
       const toolResult = this.sessionData.toolResults.get(toolUse.id);
 
-      // 只检查有结果的工具调用
+      // Only check tool invocations that produced a result
       if (!toolResult || toolResult.is_error) {
         continue;
       }
 
-      // 写入类操作本身已经对外部状态产生了持久影响，不应判为 dead step。
+      // Write operations already have a lasting effect on external state, so they should not be judged as a dead step.
       if (toolUse.name === 'Write') {
         continue;
       }
@@ -72,13 +72,13 @@ export class DeadStepDetector implements IDetector {
         continue;
       }
 
-      // 获取后续步骤
+      // Get the subsequent steps
       const subsequentSteps = this.getSubsequentSteps(toolUse, toolUses.slice(i + 1));
       const subsequentMessages = this.getSubsequentMessages(toolUse, orderedMessages);
       const context = this.buildCodeContext(toolUse, toolResult);
       const hasContextCarry = this.isCarriedInSubsequentContext(toolUse, subsequentMessages);
 
-      // 检查4个条件
+      // Check the 4 conditions
       const checks = {
         noToolInputRef: !this.isReferencedInToolInputs(toolResult, subsequentSteps, context),
         noPlanRef: !this.isReferencedInPlans(toolResult, subsequentMessages, context),
@@ -86,7 +86,7 @@ export class DeadStepDetector implements IDetector {
         noBranchImpact: !this.causedBranchChange(toolUse, subsequentSteps),
       };
 
-      // 计算证据强度
+      // Compute the evidence strength
       const failedChecks = Object.values(checks).filter(v => v).length;
 
       if (failedChecks >= 3) {
@@ -94,7 +94,7 @@ export class DeadStepDetector implements IDetector {
           continue;
         }
 
-        // 强证据或中证据
+        // Strong evidence or medium evidence
         const evidenceType = failedChecks === 4 && !hasContextCarry ? 'strong' : 'medium';
         const severity = failedChecks === 4 && !hasContextCarry ? Severity.Error : Severity.Warning;
         const deduction = evidenceType === 'strong' ? 1.0 : 0.5;
@@ -102,13 +102,13 @@ export class DeadStepDetector implements IDetector {
         issues.push({
           metric: 'deadStep',
           severity,
-          message: `检测到死步骤: ${toolUse.name} 的结果未被后续流程有效引用 (${failedChecks}/4个检查失败)`,
+          message: `Detected dead step: the result of ${toolUse.name} is not effectively referenced by the subsequent flow (${failedChecks}/4 checks failed)`,
           location: {
             stepRange: [i, i],
             toolUseId: toolUse.id,
             messageUuid: toolUse.messageUuid,
           },
-          suggestion: `该步骤的结果似乎未被使用。考虑移除此步骤或确保其结果被后续步骤引用`,
+          suggestion: `The result of this step appears to be unused. Consider removing this step or ensuring its result is referenced by subsequent steps`,
           evidence: {
             type: evidenceType,
             details: {
@@ -140,7 +140,7 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 获取后续步骤
+   * Get the subsequent steps
    */
   private getSubsequentSteps(
     currentToolUse: ToolUseInfo,
@@ -172,7 +172,7 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 检查是否在后续工具输入中被引用
+   * Check whether it is referenced in subsequent tool inputs
    */
   private isReferencedInToolInputs(
     toolResult: any,
@@ -185,14 +185,14 @@ export class DeadStepDetector implements IDetector {
     for (const step of subsequentSteps) {
       const inputStr = JSON.stringify(step.toolUse.input);
 
-      // 检查是否包含结果中的关键词
+      // Check whether it contains keywords from the result
       for (const keyword of context.keywords) {
         if (inputStr.includes(keyword)) {
           return true;
         }
       }
 
-      // 符号级引用：类/函数/方法名出现在后续输入中
+      // Symbol-level reference: a class/function/method name appears in subsequent inputs
       for (const sym of context.symbols) {
         if (sym && inputStr.includes(sym)) {
           return true;
@@ -203,7 +203,7 @@ export class DeadStepDetector implements IDetector {
         return true;
       }
 
-      // 检查文件路径引用
+      // Check file path references
       if (step.toolUse.name === 'Read' || step.toolUse.name === 'Edit' || step.toolUse.name === 'Write') {
         const filePath = step.toolUse.input.file_path;
         if (filePath) {
@@ -216,7 +216,7 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 检查是否在后续计划/思考中被引用
+   * Check whether it is referenced in subsequent plans/reasoning
    */
   private isReferencedInPlans(
     toolResult: any,
@@ -227,7 +227,7 @@ export class DeadStepDetector implements IDetector {
     if (!resultContent) return false;
 
     for (const message of subsequentMessages) {
-      // 检查assistant消息的文本内容
+      // Check the text content of assistant messages
       if (message.type === 'assistant') {
         const messageText = this.extractMessageText(message.content);
 
@@ -249,14 +249,14 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 检查是否在后续文件操作中被引用
+   * Check whether it is referenced in subsequent file operations
    */
   private isReferencedInFileOps(
     toolResult: any,
     subsequentSteps: Array<{ toolUse: ToolUseInfo; message: MessageNode }>,
     context: { files: Set<string>; symbols: Set<string>; keywords: string[] }
   ): boolean {
-    // 提取结果中提到的文件路径
+    // Extract the file paths mentioned in the result
     const resultContent = this.extractResultContent(toolResult);
     const filePaths = this.extractFilePaths(resultContent);
     for (const file of context.files) {
@@ -266,7 +266,7 @@ export class DeadStepDetector implements IDetector {
     if (filePaths.length === 0 && context.symbols.size === 0) return false;
 
     for (const step of subsequentSteps) {
-      // 检查是否对相关文件进行了操作
+      // Check whether the related files were operated on
       if (step.toolUse.name === 'Read' || step.toolUse.name === 'Edit' || step.toolUse.name === 'Write') {
         const targetFile = step.toolUse.input.file_path;
 
@@ -296,17 +296,17 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 检查是否导致分支变化
+   * Check whether it caused a branch change
    */
   private causedBranchChange(
     toolUse: ToolUseInfo,
     subsequentSteps: Array<{ toolUse: ToolUseInfo; message: MessageNode }>
   ): boolean {
-    // 检查是否有新的Agent被创建
+    // Check whether a new Agent was created
     const beforeAgents = new Set<string>();
     const afterAgents = new Set<string>();
 
-    // 统计该步骤前后的agent
+    // Count the agents before and after this step
     for (const [agentId, agent] of this.sessionData.agents.entries()) {
       if (agent.createdAt < toolUse.timestamp) {
         beforeAgents.add(agentId);
@@ -315,12 +315,12 @@ export class DeadStepDetector implements IDetector {
       }
     }
 
-    // 如果有新agent创建，可能是该步骤的影响
+    // If a new agent was created, it may be an effect of this step
     if (afterAgents.size > beforeAgents.size) {
-      // 检查新agent是否在合理时间窗口内
+      // Check whether the new agent falls within a reasonable time window
       for (const agentId of afterAgents) {
         const agent = this.sessionData.agents.get(agentId);
-        if (agent && Math.abs(agent.createdAt - toolUse.timestamp) < 10000) { // 10秒内
+        if (agent && Math.abs(agent.createdAt - toolUse.timestamp) < 10000) { // Within 10 seconds
           return true;
         }
       }
@@ -330,8 +330,9 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 检查该步骤是否仍被后续步骤的上下文链继承。
-   * 这是弱使用信号：说明结果仍处于后续推理上下文中，但不等价于显式消费。
+   * Check whether this step is still inherited by the context chain of subsequent steps.
+   * This is a weak usage signal: it indicates the result remains in the subsequent reasoning context,
+   * but it is not equivalent to explicit consumption.
    */
   private isCarriedInSubsequentContext(
     toolUse: ToolUseInfo,
@@ -343,7 +344,7 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 提取结果内容
+   * Extract the result content
    */
   private extractResultContent(result: any): string {
     if (typeof result.content === 'string') {
@@ -361,21 +362,21 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 提取关键词
+   * Extract keywords
    */
   private extractKeywords(content: string): string[] {
-    // 提取有意义的词（长度>=4）
+    // Extract meaningful words (length >= 4)
     const words = content
       .split(/\s+/)
       .map(w => w.replace(/[^\w]/g, ''))
-      .filter(w => w.length >= 4 && !/^\d+$/.test(w)); // 排除纯数字
+      .filter(w => w.length >= 4 && !/^\d+$/.test(w)); // Exclude purely numeric tokens
 
-    // 去重并返回前20个
+    // Deduplicate and return the first 20
     return [...new Set(words)].slice(0, 20);
   }
 
   /**
-   * 提取消息文本
+   * Extract the message text
    */
   private extractMessageText(content: any): string {
     if (typeof content === 'string') {
@@ -393,16 +394,16 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 提取文件路径
+   * Extract file paths
    */
   private extractFilePaths(content: string): string[] {
     const paths: string[] = [];
 
-    // 匹配常见的文件路径模式
+    // Match common file path patterns
     const pathPatterns = [
-      /[\w\/\-\.]+\.[a-zA-Z]{1,4}/g, // 带扩展名的路径
-      /src\/[\w\/\-\.]+/g,             // src目录下的路径
-      /\/[\w\/\-\.]+/g,                // 绝对路径
+      /[\w\/\-\.]+\.[a-zA-Z]{1,4}/g, // Paths with an extension
+      /src\/[\w\/\-\.]+/g,             // Paths under the src directory
+      /\/[\w\/\-\.]+/g,                // Absolute paths
     ];
 
     for (const pattern of pathPatterns) {
@@ -498,7 +499,7 @@ export class DeadStepDetector implements IDetector {
   }
 
   /**
-   * 获取结果预览
+   * Get a preview of the result
    */
   private getResultPreview(result: any): string {
     const content = this.extractResultContent(result);

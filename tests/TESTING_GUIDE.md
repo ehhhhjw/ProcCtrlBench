@@ -1,38 +1,38 @@
-# 测试指南
+# Testing Guide
 
-当前测试与验证应围绕非评分制输出进行。
+Current testing and validation should center on the non-scoring output.
 
-## 核心检查项
+## Core Checks
 
-### 报告结构
+### Report Structure
 
-- 不应存在 `totalScore`
-- 不应存在 `overallAssessment`
-- 不应存在维度 `score`
-- `summary.totalWarnings` / `summary.totalErrors` 必须存在
-- `diagnostics` 不应暴露 `deduction`
+- `totalScore` must not be present
+- `overallAssessment` must not be present
+- dimension `score` must not be present
+- `summary.totalWarnings` / `summary.totalErrors` must be present
+- `diagnostics` must not expose `deduction`
 
-### 任务结果
+### Task Outcome
 
-- `taskCompletionRate` 必须在 `0~1`
-- `outputExecutability` 必须在 `0~1`
-- `postModificationVerificationRate` 必须在 `0~1`
+- `taskCompletionRate` must be within `0~1`
+- `outputExecutability` must be within `0~1`
+- `postModificationVerificationRate` must be within `0~1`
 
-### 基准规则
+### Baseline Rules
 
-- `Write` 不能被判为 `deadStep`
-- `DuplicateStep` 应考虑 AST 符号重合度
-- `LongChain` 应考虑显式与隐式阶段切分
-- `InterfaceConsistency` / `WeakTool` 应能使用项目 AST 和 related files 数据
+- `Write` must not be judged a `deadStep`
+- `DuplicateStep` should take AST symbol overlap into account
+- `LongChain` should take explicit and implicit phase splits into account
+- `InterfaceConsistency` / `WeakTool` should be able to use project AST and related files data
 
-### 聚合
+### Aggregation
 
-- `BenchmarkRunner` 只能聚合 warning/error 统计
-- 不应再计算平均分或评级
+- `BenchmarkRunner` may only aggregate warning/error statistics
+- it must no longer compute average scores or ratings
 
-## 建议验证方式
+## Recommended Validation Procedure
 
-1. 运行 `npm run build`
-2. 运行 `npm run example`
-3. 检查生成的 JSON / Markdown 报告字段
-4. 准备带项目 AST 的用例和不带项目 AST 的用例，比较 detector 行为差异
+1. Run `npm run build`
+2. Run `npm run example`
+3. Inspect the fields of the generated JSON / Markdown reports
+4. Prepare test cases with a project AST and test cases without one, then compare the difference in detector behavior

@@ -1,55 +1,55 @@
-# 评测指标实现总览
+# Evaluation Metric Implementation Overview
 
-本文件描述单会话诊断层的指标体系（非评分制）。论文复现层另外使用
-`src/benchmark/ProcCtrlScorecard.ts`（Qctx/Qtool/Qwf/Qeco/CP/PB，η=0.70）与
-`src/benchmark/HierarchicalCalibration.ts`（层次贝叶斯校准）；完整口径见
-[docs/reproducing_paper_results.md](./reproducing_paper_results.md)。
+This document describes the single-session diagnostic metric layer (non-scored). The paper reproduction layer also uses
+`src/benchmark/ProcCtrlScorecard.ts` (Qctx/Qtool/Qwf/Qeco/CP/PB, eta=0.70) and
+`src/benchmark/HierarchicalCalibration.ts` (hierarchical Bayesian calibration); see
+[docs/reproducing_paper_results.md](./reproducing_paper_results.md) for the full definitions.
 
-当前诊断层重点是：
+The current diagnostic layer focuses on:
 
-- 产生 issue
-- 产生 finding
-- 输出 posterior risk
-- 输出 control preservation
-- 输出 execution guidance
-- 统计 warning / error
-- 输出任务结果质量摘要
-- 支持跨报告统计聚合
+- producing issues
+- producing findings
+- reporting posterior risk
+- reporting control preservation
+- reporting execution guidance
+- counting warnings / errors
+- reporting a quality summary of the task outcome
+- supporting statistical aggregation across reports
 
-## 实现位置
+## Implementation Locations
 
-- 阈值配置：
+- Threshold configuration:
   - [src/config/evaluation.config.ts](./src/config/evaluation.config.ts)
-- 类型定义：
+- Type definitions:
   - [src/types/evaluation.types.ts](./src/types/evaluation.types.ts)
-- 检测器：
+- Detectors:
   - [src/detectors](./src/detectors)
-- 评估器：
+- Evaluators:
   - [src/evaluators](./src/evaluators)
-- AST / 文件关系分析：
+- AST / file relationship analysis:
   - [src/analyzers](./src/analyzers)
-- 报告组装与输出：
+- Report assembly and output:
   - [src/scoring/ScoreCalculator.ts](./src/scoring/ScoreCalculator.ts)
   - [src/scoring/ReportGenerator.ts](./src/scoring/ReportGenerator.ts)
 
-## 报告模型
+## Report Model
 
 ### `taskOutcome`
 
-`taskOutcome` 不再汇总成总分，只输出三个质量指标：
+`taskOutcome` is no longer aggregated into a total score; it only reports three quality metrics:
 
 - `taskCompletionRate`
 - `outputExecutability`
 - `postModificationVerificationRate`
 
-### 4 个 issue 维度
+### The 4 issue dimensions
 
-- 上下文管理
-- 工具使用效率
-- 工作流架构
-- 工具生态一致性
+- context management
+- tool usage efficiency
+- workflow architecture
+- tool ecosystem consistency
 
-每个维度输出：
+Each dimension reports:
 
 - `warnings`
 - `errors`
@@ -58,7 +58,7 @@
 
 ### `diagnostics`
 
-对外暴露：
+Exposed externally:
 
 - `metric`
 - `severity`
@@ -67,11 +67,11 @@
 - `suggestion`
 - `evidence`
 
-内部 detector 仍可使用 `deduction` 作为严重性权重，但它不再进入最终报告的对外 schema。
+Internally, detectors may still use `deduction` as a severity weight, but it no longer enters the externally facing schema of the final report.
 
 ### `findings`
 
-`findings` 是对 `diagnostics` 的标准化过程投影，新增：
+`findings` is the standardized process-level projection of `diagnostics`, additionally providing:
 
 - `dimension`
 - `detectorScore`
@@ -83,168 +83,168 @@
 
 ### `risk`
 
-`risk` 是过程型风险聚合层，当前实现输出：
+`risk` is the process-level risk aggregation layer; the current implementation reports:
 
 - `overallRisk`
 - `averagePosteriorRisk`
 - `warningFindings`
 - `errorFindings`
 - `topRiskFindings`
-- 各一级维度 `averagePosteriorRisk` / `maxPosteriorRisk`
+- `averagePosteriorRisk` / `maxPosteriorRisk` for each top-level dimension
 
 ### `controlPreservation`
 
-`controlPreservation` 用于衡量控制保持能力，包含：
+`controlPreservation` measures control preservation capability, and comprises:
 
 - `interpretability`
 - `interruptibility`
 - `corrigibility`
 - `reversibility`
 - `handoffAwareness`
-- 总分 `score`
-- 等级 `level`
+- the total `score`
+- the `level` grade
 
 ### `executionGuidance`
 
-`executionGuidance` 将过程风险反馈为治理动作建议，当前输出：
+`executionGuidance` feeds process-level risk back as recommended governance actions; it currently reports:
 
 - `autonomyLevel`
 - `recommendedActions`
 - `rationale`
 
-## 11 个基准
+## The 11 Benchmarks
 
 ### 1. Ghost Context
 
-- 实现：
+- Implementation:
   - [src/detectors/GhostContextDetector.ts](./src/detectors/GhostContextDetector.ts)
   - [src/analyzers/ContextChainAnalyzer.ts](./src/analyzers/ContextChainAnalyzer.ts)
-- 检查：
-  - 摘要与原文共存
-  - 不可消费的大 payload
-  - 有摘要但原始结果后续未再被引用
-- 增强：
-  - 结合 `CodeContextAnalyzer`
-  - 结合 `project-ast.json` 判断代码上下文是否仍活跃
+- Checks:
+  - a summary coexisting with its source text
+  - large payloads that cannot be consumed
+  - a summary exists, but the original result is never referenced again afterwards
+- Enhancements:
+  - combined with `CodeContextAnalyzer`
+  - combined with `project-ast.json` to determine whether the code context is still active
 
 ### 2. Oversized Rules
 
-- 实现：
+- Implementation:
   - [src/detectors/OversizedRulesDetector.ts](./src/detectors/OversizedRulesDetector.ts)
-- 检查：
-  - `system` 消息体积
-  - 在上下文中的占比
-  - 是否为最大静态内容块
+- Checks:
+  - the size of the `system` message
+  - its share of the context
+  - whether it is the largest static content block
 
 ### 3. Context Thrashing
 
-- 实现：
+- Implementation:
   - [src/detectors/ThrashingDetector.ts](./src/detectors/ThrashingDetector.ts)
   - [src/analyzers/ContextChainAnalyzer.ts](./src/analyzers/ContextChainAnalyzer.ts)
-- 检查：
-  - 接近窗口上限时载入大对象
-  - 载入后 2 步内发生压缩
-  - 压缩前代码上下文没有得到有效复用
-- 说明：
-  - 当前窗口占用统计按真实祖先链计算，不再把无关 sibling 分支的 token 混入当前 step。
+- Checks:
+  - loading a large object while close to the window limit
+  - compaction occurring within 2 steps after loading
+  - the code context not being effectively reused before compaction
+- Note:
+  - Window occupancy statistics are currently computed along the true ancestor chain, so tokens from unrelated sibling branches are no longer mixed into the current step.
 
 ### 4. Tool Call Chain
 
-- 实现：
+- Implementation:
   - [src/detectors/ToolChainDetector.ts](./src/detectors/ToolChainDetector.ts)
-- 检查：
-  - 同工具连续调用过长
-  - 工具调用形成循环模式
-- 豁免：
-  - 输入显著不同
-  - 合理批处理
-  - 收敛式搜索
+- Checks:
+  - excessively long consecutive calls to the same tool
+  - tool calls forming a cyclic pattern
+- Exemptions:
+  - significantly different inputs
+  - legitimate batch processing
+  - convergent search
 
 ### 5. Dead Step
 
-- 实现：
+- Implementation:
   - [src/detectors/DeadStepDetector.ts](./src/detectors/DeadStepDetector.ts)
   - [src/analyzers/ContextChainAnalyzer.ts](./src/analyzers/ContextChainAnalyzer.ts)
-- 检查：
-  - 工具结果是否进入后续工具输入
-  - 是否进入 assistant 文本计划
-  - 是否触达相关文件或相关符号
-  - 是否引发分支变化
-- 当前特别规则：
-  - `Write` 不会被判定为 `deadStep`
-- 说明：
-  - 当前“后续引用”优先限定在真实后代消息范围内，避免被无关分支的晚到消息误判为已消费。
+- Checks:
+  - whether the tool result feeds into a subsequent tool input
+  - whether it feeds into an assistant textual plan
+  - whether it reaches a relevant file or relevant symbol
+  - whether it induces a branch change
+- Current special rule:
+  - `Write` is never judged to be a `deadStep`
+- Note:
+  - "Subsequent reference" is currently restricted, as a priority, to the scope of true descendant messages, so as to avoid late-arriving messages from unrelated branches being misjudged as consumption.
 
 ### 6. Duplicate Step
 
-- 实现：
+- Implementation:
   - [src/detectors/DuplicateStepDetector.ts](./src/detectors/DuplicateStepDetector.ts)
-- 检查：
-  - 输入结构相似
-  - 中间没有相关文件变更
-  - 输出高度相似
-  - AST 符号集合高度重合
+- Checks:
+  - structurally similar inputs
+  - no relevant file changes in between
+  - highly similar outputs
+  - highly overlapping AST symbol sets
 
 ### 7. Wrapper Workflow
 
-- 实现：
+- Implementation:
   - [src/detectors/WrapperDetector.ts](./src/detectors/WrapperDetector.ts)
-- 检查：
-  - Agent 内部步骤极少
-  - 下游工具类型单一
-  - 输入输出相似
-  - 无验证
-  - 符号增量很低
+- Checks:
+  - very few internal steps in the agent
+  - a single downstream tool type
+  - similar input and output
+  - no verification
+  - very low symbol increment
 
 ### 8. Context Coupling
 
-- 实现：
+- Implementation:
   - [src/detectors/CouplingDetector.ts](./src/detectors/CouplingDetector.ts)
-- 检查：
-  - 调用图 SCC
-  - 交替调用模式
-  - 回边
-  - 代码邻域之间反复回流
+- Checks:
+  - SCCs in the call graph
+  - alternating call patterns
+  - back edges
+  - repeated backflow between code neighborhoods
 
 ### 9. Long Chain
 
-- 实现：
+- Implementation:
   - [src/detectors/LongChainDetector.ts](./src/detectors/LongChainDetector.ts)
-- 检查：
-  - 显式子任务
-  - 显式检查点
-  - 隐式代码簇切换
-  - 隐式验证性回读
+- Checks:
+  - explicit subtasks
+  - explicit checkpoints
+  - implicit code-cluster switching
+  - implicit verification re-reads
 
 ### 10. Interface Inconsistency
 
-- 实现：
+- Implementation:
   - [src/detectors/InterfaceConsistencyDetector.ts](./src/detectors/InterfaceConsistencyDetector.ts)
-- 检查：
-  - 参数名集合差异
-  - 参数类型差异
-  - 返回结果形态差异
-  - 返回符号类型分布差异
-  - 在相近代码邻域上的接口风险
+- Checks:
+  - divergence in parameter name sets
+  - divergence in parameter types
+  - divergence in the shape of returned results
+  - divergence in the type distribution of returned symbols
+  - interface risk over adjacent code neighborhoods
 
 ### 11. Weak Tool
 
-- 实现：
+- Implementation:
   - [src/detectors/WeakToolDetector.ts](./src/detectors/WeakToolDetector.ts)
-- 检查：
-  - 适用任务数
-  - 实际调用数
-  - 替代工具覆盖
-  - 项目 AST / 文件关系增强后的适用场景识别
+- Checks:
+  - the number of applicable tasks
+  - the number of actual calls
+  - coverage by alternative tools
+  - identification of applicable scenarios after enhancement with the project AST / file relationships
 
-## AST 与项目关系
+## AST and Project Relationships
 
 ### AST
 
 - [src/analyzers/AstAnalyzer.ts](./src/analyzers/AstAnalyzer.ts)
-- 基于 tree-sitter
-- 支持多语言
-- 抽取：
+- based on tree-sitter
+- multi-language support
+- extracts:
   - classes
   - functions
   - methods
@@ -252,45 +252,45 @@
   - variables
   - calls
 
-### 项目级关系
+### Project-level relationships
 
 - [src/analyzers/ProjectAstLoader.ts](./src/analyzers/ProjectAstLoader.ts)
 - [src/analyzers/FileAssociationLoader.ts](./src/analyzers/FileAssociationLoader.ts)
 
-输入来源：
+Input sources:
 
-- 项目代码解析结果
-- 外部 related files 数据
+- project code parsing results
+- external related-files data
 
-输出用途：
+Output uses:
 
-- 间接文件引用
-- 符号所有权
-- 代码邻域扩展
-- 模块簇切换识别
+- indirect file references
+- symbol ownership
+- code neighborhood expansion
+- module cluster switching identification
 
-## 当前统计口径
+## Current Statistical Conventions
 
-### 单份报告
+### A single report
 
-单份报告输出：
+A single report reports:
 
-- 总告警数
-- 总错误数
-- 每维度告警数 / 错误数
-- 关键问题
-- 优势
+- total number of warnings
+- total number of errors
+- number of warnings / errors per dimension
+- key issues
+- strengths
 
-### 多份报告
+### Multiple reports
 
-[src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts) 当前聚合：
+[src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts) currently aggregates:
 
-- 每维度平均告警数
-- 每维度平均错误数
+- average number of warnings per dimension
+- average number of errors per dimension
 - 95% CI
 
-不再聚合：
+No longer aggregated:
 
-- 总分
-- 评级
-- 维度分数
+- total score
+- rating
+- dimension scores

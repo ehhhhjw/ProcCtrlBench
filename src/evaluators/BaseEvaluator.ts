@@ -8,7 +8,7 @@ import {
 } from '../types/evaluation.types';
 
 /**
- * 评估器基类
+ * Base class for evaluators
  */
 export abstract class BaseEvaluator implements IEvaluator {
   protected sessionData: SessionData;
@@ -24,7 +24,7 @@ export abstract class BaseEvaluator implements IEvaluator {
   abstract evaluate(): Promise<EvaluationResult>;
 
   /**
-   * 统计问题数量
+   * Counts issues by severity
    */
   protected calculateIssueStats(issues: DetectionIssue[]): {
     warnings: number;
@@ -48,7 +48,7 @@ export abstract class BaseEvaluator implements IEvaluator {
   }
 
   /**
-   * 创建问题对象
+   * Creates an issue object
    */
   protected createIssue(
     metric: string,

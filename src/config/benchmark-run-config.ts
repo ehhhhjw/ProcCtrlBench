@@ -130,9 +130,11 @@ type RawConfig = {
 };
 
 /**
- * 数据集与外部仓库的位置因机器而异，因此默认值从环境变量读取，
- * 未设置时退化为仓库外的相对占位路径。请通过
- * config/benchmark-model.config.yaml 或对应环境变量指定真实路径。
+ * Dataset and external repository locations vary from machine to machine, so
+ * defaults are read from environment variables and fall back to relative
+ * placeholder paths outside the repository when unset. Specify the real paths
+ * via config/benchmark-model.config.yaml or the corresponding environment
+ * variables.
  */
 function envPath(name: string, fallback: string): string {
   const value = process.env[name];

@@ -1,515 +1,515 @@
-# 当前 11 个基准评估方案
+# The Current 11 Benchmark Evaluation Schemes
 
-本文整理当前仓库里实际落地的 11 个评测基准方案，统一说明：
-- 评估所依赖的数据基础
-- 每个基准的检测信号与判定逻辑
-- 当前阈值与扣分方式
-- 误报控制
-- 建议整改方向
+This document consolidates the 11 evaluation benchmark schemes that are actually implemented in the current repository, describing each of them in a uniform way:
+- The data foundation on which the evaluation relies
+- The detection signals and decision logic of each benchmark
+- The current thresholds and penalty scheme
+- False positive control
+- Recommended remediation directions
 
-本文以当前实现为准，相关代码主要位于 `src/detectors/`、`src/analyzers/`、`src/config/evaluation.config.ts`。
+This document reflects the current implementation; the relevant code resides mainly in `src/detectors/`, `src/analyzers/`, and `src/config/evaluation.config.ts`.
 
-## 一、统一数据基础
+## I. Unified Data Foundation
 
-### 1. 轨迹数据
-- 来源：`SessionData`
-- 主要字段：
+### 1. Trajectory Data
+- Source: `SessionData`
+- Main fields:
   - `messages`
   - `toolUses`
   - `toolResults`
   - `agents`
   - `replacements`
-- 用途：恢复执行链、上下文变化、工具调用顺序、文件读写、Agent 分支与压缩行为。
+- Purpose: to recover the execution chain, context changes, tool invocation order, file reads and writes, and Agent branching and compaction behavior.
 
-### 2. 文件关联图谱
-- 产物：`output/file-graph.json`
-- 作用：判断文件的间接关联、间接变更、间接引用。
-- 加载器：`src/analyzers/FileAssociationLoader.ts`
+### 2. File Association Graph
+- Artifact: `output/file-graph.json`
+- Role: to determine indirect associations, indirect changes, and indirect references among files.
+- Loader: `src/analyzers/FileAssociationLoader.ts`
 
-### 3. 项目级 AST 分析
-- 产物：`output/project-ast.json`
-- 构建脚本：`scripts/build-file-graph.ts`
-- 配置文件：`config/project-analysis.config.json`
-- 可配置项：
-  - `projectPath`：待分析项目路径
-  - `relatedFilesDataPath`：外部 related-files 数据路径
-- AST 能力：
-  - 基于 tree-sitter 的多语言全量解析
-  - 当前支持：TypeScript、TSX、JavaScript、Python、Java、C++、C#
-  - 细粒度提取：
-    - 类
-    - 函数
-    - 方法
-    - 属性
-    - 变量
-    - 调用点
-    - 文件关系
-    - 符号所有权
-    - 代码邻域
-- 相关代码：
+### 3. Project-Level AST Analysis
+- Artifact: `output/project-ast.json`
+- Build script: `scripts/build-file-graph.ts`
+- Configuration file: `config/project-analysis.config.json`
+- Configurable options:
+  - `projectPath`: the path of the project to be analyzed
+  - `relatedFilesDataPath`: the path of the external related-files data
+- AST capabilities:
+  - Full multi-language parsing based on tree-sitter
+  - Currently supported: TypeScript, TSX, JavaScript, Python, Java, C++, C#
+  - Fine-grained extraction of:
+    - Classes
+    - Functions
+    - Methods
+    - Properties
+    - Variables
+    - Call sites
+    - File relations
+    - Symbol ownership
+    - Code neighborhoods
+- Related code:
   - `src/analyzers/AstAnalyzer.ts`
   - `src/analyzers/ProjectAstLoader.ts`
 
-### 4. 外部 related files 数据
-- 来源：用户提供的外部结果目录
-- 合并方式：在项目 AST 分析阶段并入 `project-ast.json`
-- 当前关系类型：`external_related`
-- 作用：把文件实现链路上的相关文件一起纳入基础评测上下文
+### 4. External related files Data
+- Source: an external result directory provided by the user
+- Merge method: incorporated into `project-ast.json` during the project AST analysis stage
+- Current relation type: `external_related`
+- Role: to bring the files that are related along a file's implementation path into the base evaluation context
 
-### 5. 阈值与预警
-- 阈值配置：`src/config/evaluation.config.ts`
-- 预警输出：`output/prewarn.json`
-- 用途：在正式命中 Warning/Error 前，对接近阈值的行为提前提示
+### 5. Thresholds and Prewarn
+- Threshold configuration: `src/config/evaluation.config.ts`
+- Prewarn output: `output/prewarn.json`
+- Purpose: to give an early hint about behavior that is near threshold, before a Warning/Error is formally triggered
 
 ---
 
-## 二、11 个基准的当前方案
+## II. The Current Scheme of Each of the 11 Benchmarks
 
 ## 1. Ghost Context
 
-### 目标
-- 检测上下文中残留但后续无实质作用的大段内容，尤其是摘要后仍保留的原文、不可消费 payload、超长噪声内容。
+### Objective
+- To detect large blocks of content that remain in the context but serve no substantive purpose afterwards, in particular source text still retained after summarization, non-consumable payloads, and excessively long noisy content.
 
-### 当前信号
-- `content-replacement` 之后原文与摘要共存
-- base64 / 二进制 / 超长单行等不可消费内容
-- 后续 5 步内是否被文本或工具输入引用
-- 后续步骤是否继续触达相同代码符号、同一文件邻域或 related files
+### Current Signals
+- The source text and the summary coexist after a `content-replacement`
+- Non-consumable content such as base64, binary data, or excessively long single lines
+- Whether it is referenced by text or by tool input within the following 5 steps
+- Whether subsequent steps continue to touch the same code symbols, the same file neighborhood, or the same related files
 
-### 判定逻辑
-- 如果一段大内容在摘要或替换后仍长时间保留，且没有被后续步骤有效引用，则视为幽灵上下文
-- 如果载荷本身为不可消费噪声，也计入浪费
-- 对代码类内容，不再只看关键词引用；若后续步骤继续作用于相同代码邻域，则不轻易判定为 ghost
+### Decision Logic
+- If a large block of content is still retained for a long time after summarization or replacement and is not effectively referenced by subsequent steps, it is regarded as ghost context
+- If the payload itself is non-consumable noise, it also counts as waste
+- For code-type content, keyword references alone are no longer decisive; if subsequent steps continue to operate on the same code neighborhood, the content is not readily judged as ghost
 
-### 当前阈值
-- Warning：`512` tokens
-- Error：`1024` tokens
+### Current Thresholds
+- Warning: `512` tokens
+- Error: `1024` tokens
 
-### 扣分
-- Warning：`0.5`
-- Error：`1.5`
+### Penalty
+- Warning: `0.5`
+- Error: `1.5`
 
-### 误报控制
-- 摘要后若仍有后续引用，不判浪费
-- 短暂共存的小片段不计入
+### False Positive Control
+- If there are still subsequent references after summarization, it is not judged as waste
+- Small fragments that coexist only briefly are not counted
 
-### 整改方向
-- 摘要后及时移除原文
-- 对大对象先摘要，再外链或落盘
+### Remediation Direction
+- Remove the source text promptly after summarization
+- Summarize large objects first, then link them externally or persist them to disk
 
 ---
 
 ## 2. Oversized Rules
 
-### 目标
-- 检测 system/rules 规则块过大、占比过高，长期挤压有效上下文窗口。
+### Objective
+- To detect `system`/rules blocks that are oversized or occupy too large a share, persistently squeezing the effective context window.
 
-### 当前信号
-- `system` 内容 token 数
-- `system` 在累计上下文中的占比
-- 是否为最大的静态上下文块
+### Current Signals
+- The token count of the `system` content
+- The share of `system` in the cumulative context
+- Whether it is the largest static context block
 
-### 判定逻辑
-- 当规则体积或占比超过阈值时触发
-- 同时考虑绝对大小和相对占比
+### Decision Logic
+- Triggered when the rule volume or its share exceeds the threshold
+- Both the absolute size and the relative share are taken into account
 
-### 当前阈值
-- token Warning / Error：`2000 / 4000`
-- ratio Warning / Error：`0.20 / 0.35`
+### Current Thresholds
+- token Warning / Error: `2000 / 4000`
+- ratio Warning / Error: `0.20 / 0.35`
 
-### 扣分
-- Warning：`0.5`
-- Error：`1.5`
+### Penalty
+- Warning: `0.5`
+- Error: `1.5`
 
-### 误报控制
-- 与其他静态块对比，避免误把较小但出现较早的 system 误判成过大
+### False Positive Control
+- A comparison against the other static blocks is made, so as to avoid misjudging a smaller but earlier-appearing `system` as oversized
 
-### 整改方向
-- 精简规则
-- 长文档外链
-- 规则按需加载
+### Remediation Direction
+- Streamline the rules
+- Link long documents externally
+- Load rules on demand
 
 ---
 
 ## 3. Context Thrashing
 
-### 目标
-- 检测接近窗口上限时读取大对象，随后又快速发生压缩，导致新引入信息没有被有效消费。
+### Objective
+- To detect the reading of large objects when the window limit is nearly reached, followed shortly by compaction, so that the newly introduced information is never effectively consumed.
 
-### 当前信号
+### Current Signals
 - `context_tokens_before`
 - `context_tokens_after`
-- 是否在接近窗口阈值后很快出现压缩
-- 压缩前读入的数据是否被后续使用
-- 压缩前是否已经在同一代码邻域继续执行
+- Whether compaction occurs soon after the window threshold is approached
+- Whether the data read in before compaction is used afterwards
+- Whether execution had already been continuing within the same code neighborhood before compaction
 
-### 判定逻辑
-- 当窗口占用达到高位后，又在很短步数内发生 replacement 或 token 显著回落，视为抖动
-- 区分两类：
+### Decision Logic
+- When window occupancy reaches a high level and a replacement or a significant drop in tokens occurs within very few steps, this is regarded as thrashing
+- Two categories are distinguished:
   - `timing_fault`
   - `payload_oversize_fault`
-- 若压缩前已经在相同文件/符号/related-files 邻域中继续执行，则不把该载荷视为“未被利用”
+- If execution had already been continuing within the same file/symbol/related-files neighborhood before compaction, the payload is not regarded as "unused"
 
-### 当前阈值
+### Current Thresholds
 - `windowThreshold = 0.75`
 - `compressionLookAhead = 2`
 
-### 扣分
-- Warning：`1.0`
+### Penalty
+- Warning: `1.0`
 
-### 误报控制
-- 多步平缓下降不算压缩抖动
-- 纯输出波动不算
+### False Positive Control
+- A gradual multi-step decline does not count as compaction thrashing
+- Pure output fluctuation does not count
 
-### 整改方向
-- 先压缩再读
-- 大对象分批读
-- 先摘要再展开
+### Remediation Direction
+- Compact before reading
+- Read large objects in batches
+- Summarize first, then expand
 
 ---
 
 ## 4. Tool Call Chain
 
-### 目标
-- 检测相同工具的过长连续调用，或 A→B→A 一类循环调用。
+### Objective
+- To detect excessively long consecutive invocations of the same tool, or cyclic invocations of the A→B→A kind.
 
-### 当前信号
-- 同名工具连续段长度
-- 短周期循环模式
-- 输入是否足够多样
-- 是否在同一代码邻域内做渐进式批处理或收敛式搜索
+### Current Signals
+- The length of consecutive runs of the same tool
+- Short-period cyclic patterns
+- Whether the inputs are sufficiently diverse
+- Whether progressive batch processing or converging search is being carried out within the same code neighborhood
 
-### 判定逻辑
-- 连续调用过长视为重复链
-- 短周期重复模式视为循环链
-- 但如果调用序列在 related-files 邻域内持续推进、或搜索模式在收敛，则作为豁免信号
+### Decision Logic
+- Excessively long consecutive invocations are regarded as a repetitive chain
+- Short-period repeating patterns are regarded as a cyclic chain
+- However, if the invocation sequence keeps making progress within the related-files neighborhood, or if the search pattern is converging, this serves as an exemption signal
 
-### 当前阈值
-- repetitive Warning / Error：`6 / 10`
-- cyclic Warning / Error：`3 / 5`
+### Current Thresholds
+- repetitive Warning / Error: `6 / 10`
+- cyclic Warning / Error: `3 / 5`
 
-### 扣分
-- Warning：`1.0`
-- Error：`2.5`
+### Penalty
+- Warning: `1.0`
+- Error: `2.5`
 
-### 误报控制
-- 批处理场景做豁免
-- 输入多样性高的搜索/扫描不判空转
+### False Positive Control
+- Batch-processing scenarios are exempted
+- Searches/scans with high input diversity are not judged as spinning
 
-### 整改方向
-- 合并批量操作
-- 提升检索粒度
-- 循环时及时切换策略
+### Remediation Direction
+- Merge batch operations
+- Increase retrieval granularity
+- Switch strategy promptly when looping
 
 ---
 
 ## 5. Dead Step
 
-### 目标
-- 检测某一步工具结果没有被后续流程有效引用、也没有对执行分支产生影响。
+### Objective
+- To detect a step whose tool result is neither effectively referenced by the subsequent flow nor has any influence on the execution branch.
 
-### 当前数据基础
-- 轨迹数据
-- 文件关联图谱
-- 项目 AST
-- 外部 related files
+### Current Data Foundation
+- Trajectory data
+- File association graph
+- Project AST
+- External related files
 
-### 当前信号
-- 文本关键词是否在后续输入/计划中出现
-- AST 符号是否在后续步骤中出现
-- 文件或相关文件是否被后续读/写
-- 是否引起后续 Agent 分支变化
+### Current Signals
+- Whether the textual keywords appear in subsequent inputs/plans
+- Whether the AST symbols appear in subsequent steps
+- Whether the file or its related files are read/written afterwards
+- Whether it gives rise to a change in subsequent Agent branching
 
-### 判定逻辑
-- 对每个成功工具结果做四类检查：
+### Decision Logic
+- Four kinds of check are applied to every successful tool result:
   - `noToolInputRef`
   - `noPlanRef`
   - `noFileRef`
   - `noBranchImpact`
-- 失败检查数：
-  - `4/4`：Error
-  - `3/4`：Warning
+- Number of failed checks:
+  - `4/4`: Error
+  - `3/4`: Warning
 
-### 扣分
-- Warning：`0.5`
-- Error：`1.0`
+### Penalty
+- Warning: `0.5`
+- Error: `1.0`
 
-### 误报控制
-- 优先识别间接文件引用
-- 优先识别符号级引用
-- `is_error` 结果跳过
+### False Positive Control
+- Indirect file references are identified with priority
+- Symbol-level references are identified with priority
+- `is_error` results are skipped
 
-### 整改方向
-- 移除无用步骤
-- 或让后续步骤显式消费该结果
+### Remediation Direction
+- Remove the useless step
+- Or make a subsequent step explicitly consume the result
 
 ---
 
 ## 6. Duplicate Step
 
-### 目标
-- 检测对同一资源的重复操作，且两次之间没有发生足够的状态变化。
+### Objective
+- To detect repeated operations on the same resource where no sufficient state change has occurred between the two occurrences.
 
-### 当前数据基础
-- 轨迹数据
-- 文件变更时间
-- 文件关联图谱
-- 项目 AST
+### Current Data Foundation
+- Trajectory data
+- File modification times
+- File association graph
+- Project AST
 
-### 当前信号
-- 两次工具输入结构相似度
-- 两次结果文本相似度
-- AST 符号集合 Jaccard 重合度
-- 相关文件在两次之间是否变更
+### Current Signals
+- The structural similarity of the two tool inputs
+- The textual similarity of the two results
+- The Jaccard overlap of the AST symbol sets
+- Whether the related files changed between the two occurrences
 
-### 判定逻辑
-- 满足以下条件之一时判重复：
-  - 输入高相似 + 文件未变 + 结果高相似
-  - 输入高相似 + 文件未变 + 符号集合高度重合
-- 同时豁免天然时变或验证性命令
+### Decision Logic
+- A duplicate is declared when either of the following conditions holds:
+  - High input similarity + file unchanged + high result similarity
+  - High input similarity + file unchanged + highly overlapping symbol sets
+- At the same time, inherently time-varying or verification commands are exempted
 
-### 当前阈值
-- 输入结构相似度：`> 0.9`
-- 结果相似度：`> 0.9`
-- 符号 Jaccard：`> 0.8`
+### Current Thresholds
+- Input structural similarity: `> 0.9`
+- Result similarity: `> 0.9`
+- Symbol Jaccard: `> 0.8`
 
-### 扣分
-- Warning：`0.5`
-- Error：`1.5`
+### Penalty
+- Warning: `0.5`
+- Error: `1.5`
 
-### 误报控制
-- `git status`、`date` 一类时变命令豁免
-- `npm test`、`pytest` 一类验证命令豁免
+### False Positive Control
+- Time-varying commands of the `git status` and `date` kind are exempted
+- Verification commands of the `npm test` and `pytest` kind are exempted
 
-### 整改方向
-- 缓存或复用已有结果
-- 对验证步骤增加去重逻辑
+### Remediation Direction
+- Cache or reuse existing results
+- Add deduplication logic for verification steps
 
 ---
 
 ## 7. Wrapper Workflow
 
-### 目标
-- 检测 Agent 是否只是把输入透传给下游工具，没有提供真正的编排价值。
+### Objective
+- To detect whether an Agent merely passes its input through to a downstream tool without providing genuine orchestration value.
 
-### 当前数据基础
-- Agent/sidechain 轨迹
-- AST 符号抽取
-- 项目 AST 邻域
+### Current Data Foundation
+- Agent/sidechain trajectories
+- AST symbol extraction
+- Project AST neighborhoods
 
-### 当前信号
-- 内部步骤数是否极少
-- 下游工具类型是否单一
-- Agent 输入与下游输入是否高度相似
-- Agent 输出与下游输出是否高度相似
-- 是否缺少验证逻辑
-- 代码作用域是否过窄
-- 新增符号占比是否很低
+### Current Signals
+- Whether the number of internal steps is extremely small
+- Whether the downstream tool type is homogeneous
+- Whether the Agent input is highly similar to the downstream input
+- Whether the Agent output is highly similar to the downstream output
+- Whether verification logic is absent
+- Whether the code scope is too narrow
+- Whether the share of newly added symbols is very low
 
-### 判定逻辑
-- 以多项条件的满足比例衡量包装程度
-- 统计某个 Agent 在多次调用中的 wrapper rate
-- 仅对调用次数 `>= 5` 的 Agent 进行判断
+### Decision Logic
+- The degree of wrapping is measured by the proportion of conditions that are satisfied
+- The wrapper rate of a given Agent across multiple invocations is computed
+- Only Agents with `>= 5` invocations are judged
 
-### 当前阈值
-- 预警：`>= 75%`
-- Warning：`>= 80%`
-- Error：`>= 95%`
+### Current Thresholds
+- Prewarn: `>= 75%`
+- Warning: `>= 80%`
+- Error: `>= 95%`
 
-### 扣分
-- Warning：`1.0`
-- Error：`2.0`
+### Penalty
+- Warning: `1.0`
+- Error: `2.0`
 
-### 误报控制
-- 少量调用不统计
-- 存在验证、聚合或较宽代码覆盖时不轻易判 wrapper
+### False Positive Control
+- A small number of invocations is not included in the statistics
+- When verification, aggregation, or relatively broad code coverage is present, a wrapper is not readily declared
 
-### 整改方向
-- 增加验证、转换、聚合
-- 没有额外价值时直接下沉调用
+### Remediation Direction
+- Add verification, transformation, or aggregation
+- When there is no added value, push the invocation down directly
 
 ---
 
 ## 8. Context Coupling
 
-### 目标
-- 检测工作流是否存在循环依赖、交替调用或回边，导致上下文结构耦合严重。
+### Objective
+- To detect whether the workflow contains circular dependencies, alternating invocations, or back edges that lead to severe coupling in the context structure.
 
-### 当前信号
+### Current Signals
 - Tarjan SCC
-- DFS 回边
-- A-B-A-B 交替模式
-- 代码邻域序列上的 SCC、回边和交替模式
+- DFS back edges
+- A-B-A-B alternating patterns
+- SCCs, back edges, and alternating patterns over the code neighborhood sequence
 
-### 判定逻辑
-- 非 DAG 结构视为耦合风险
-- 小 SCC 可先预警，大量交替或回边则直接告警
-- 除 Agent/调用图外，还额外检查“代码上下文图”是否在多个模块簇间来回回流
+### Decision Logic
+- A non-DAG structure is regarded as a coupling risk
+- A small SCC may first raise a prewarn, whereas numerous alternations or back edges trigger a warning directly
+- Besides the Agent/call graph, the "code context graph" is additionally checked for backflow among multiple module clusters
 
-### 扣分
-- Warning：`1.0`
+### Penalty
+- Warning: `1.0`
 
-### 误报控制
-- 合理的小范围协同不做过度惩罚
+### False Positive Control
+- Reasonable small-scope collaboration is not penalized excessively
 
-### 整改方向
-- 重构为单向数据流
-- 在阶段边界落盘/隔离上下文
+### Remediation Direction
+- Refactor into a unidirectional data flow
+- Persist/isolate the context at stage boundaries
 
 ---
 
 ## 9. Long Chain
 
-### 目标
-- 检测执行链过长，且没有足够的任务拆分或检查点。
+### Objective
+- To detect execution chains that are too long without sufficient task decomposition or checkpoints.
 
-### 当前数据基础
-- 轨迹数据
-- 项目 AST
-- 文件邻域与符号集合
+### Current Data Foundation
+- Trajectory data
+- Project AST
+- File neighborhoods and symbol sets
 
-### 当前信号
-- 总步骤数
-- 显式子任务数量
-- 显式检查点数量
-- 结构化子任务
-- 结构化检查点
+### Current Signals
+- The total number of steps
+- The number of explicit subtasks
+- The number of explicit checkpoints
+- Structured subtasks
+- Structured checkpoints
 
-### 判定逻辑
-- 有效链长：
+### Decision Logic
+- Effective chain length:
   - `Leff = L / (1 + Nsub + Nckpt)`
-- 子任务包含两类：
-  - 显式子任务：Agent / sidechain
-  - 隐式子任务：代码关注点切换到新的模块簇
-- 检查点包含两类：
-  - 显式检查点：用户消息、明确测试步骤
-  - 隐式检查点：修改后对同一代码簇做验证/回读
+- Subtasks comprise two kinds:
+  - Explicit subtasks: Agent / sidechain
+  - Implicit subtasks: the code focus shifts to a new module cluster
+- Checkpoints comprise two kinds:
+  - Explicit checkpoints: user messages, explicit test steps
+  - Implicit checkpoints: verification of, or re-reading of, the same code cluster after a modification
 
-### 当前阈值
-- effective length Warning / Error：`12 / 20`
-- simple Warning / Error：`25 / 40`
+### Current Thresholds
+- effective length Warning / Error: `12 / 20`
+- simple Warning / Error: `25 / 40`
 
-### 扣分
-- Warning：`1.0`
-- Error：`2.5`
+### Penalty
+- Warning: `1.0`
+- Error: `2.5`
 
-### 误报控制
-- 通过项目 AST 识别隐式阶段切分，避免把实际已分阶段的执行链误判成长链
+### False Positive Control
+- Implicit stage boundaries are identified through the project AST, so as to avoid misjudging an execution chain that has in fact already been staged as a long chain
 
-### 整改方向
-- 引入子任务
-- 在关键修改后加入验证
-- 用阶段性 checkpoint 切分链路
+### Remediation Direction
+- Introduce subtasks
+- Add verification after critical modifications
+- Use staged checkpoints to segment the chain
 
 ---
 
 ## 10. Interface Inconsistency
 
-### 目标
-- 检测功能相近工具在输入/输出结构上不一致，或使用边界不清晰。
+### Objective
+- To detect functionally similar tools that are inconsistent in their input/output structures, or whose usage boundaries are unclear.
 
-### 当前数据基础
-- 工具调用输入
-- 工具结果内容
-- AST 结果形态
-- 项目 AST 代码邻域
+### Current Data Foundation
+- Tool invocation inputs
+- Tool result contents
+- AST result shapes
+- Project AST code neighborhoods
 
-### 当前信号
-- 参数名集合差异
-- 参数类型差异
-- 结果形态差异：
+### Current Signals
+- Differences between the sets of parameter names
+- Differences in parameter types
+- Differences in result shape:
   - `text`
   - `json_like`
   - `json_text`
   - `code_like`
   - `path_like`
-- 返回符号类型分布差异
-- 同组工具作用的文件邻域重合度
-- 工具使用分散度
+- Differences in the distribution of returned symbol types
+- The overlap of the file neighborhoods on which the tools of the same group act
+- Tool usage dispersion
 
-### 判定逻辑
-- 对工具簇做两类分析：
+### Decision Logic
+- Two kinds of analysis are carried out on tool clusters:
   - schema difference
   - semantic overlap
-- 当语义重合度高，但 schema 差异也高时，风险更大
-- 对分散度也做语义修正：
-  - 如果项目 AST 显示这些工具其实作用于同一代码区域，则高分散度更可能是接口设计不清
-  - 如果没有项目 AST，则退回原始统计口径
+- When the semantic overlap is high but the schema difference is also high, the risk is greater
+- Dispersion is also semantically corrected:
+  - If the project AST shows that these tools in fact act on the same code region, a high dispersion is more likely to indicate unclear interface design
+  - If no project AST is available, fall back to the original statistical criterion
 
-### 当前阈值
-- interface risk Warning / Error：`> 0.4 / > 0.7`
-- dispersion Warning：`> 0.8`
+### Current Thresholds
+- interface risk Warning / Error: `> 0.4 / > 0.7`
+- dispersion Warning: `> 0.8`
 
-### 扣分
-- Warning：`1.0`
-- Error：`2.0`
+### Penalty
+- Warning: `1.0`
+- Error: `2.0`
 
-### 误报控制
-- 无项目 AST 时，不用新增语义因子破坏原有基线
-- 不同代码域的天然分工，尽量不误判成接口不一致
+### False Positive Control
+- When no project AST is available, the newly added semantic factor is not used, so as not to disturb the original baseline
+- A natural division of labor across different code domains should, as far as possible, not be misjudged as an inconsistent tool interface
 
-### 整改方向
-- 统一参数命名
-- 统一结果结构
-- 明确工具边界
+### Remediation Direction
+- Unify parameter naming
+- Unify result structures
+- Clarify tool boundaries
 
 ---
 
 ## 11. Weak Tool
 
-### 目标
-- 检测某些工具在本应适用的场景中调用率偏低，说明可发现性差或被替代。
+### Objective
+- To detect tools whose invocation rate is low in the very scenarios where they ought to apply, which indicates poor discoverability or substitution by other tools.
 
-### 当前信号
-- 推断任务类型
-- 适用任务总数
-- 实际调用数
-- 替代工具调用情况
-- 工具触达的文件邻域、符号数量与 related-files 覆盖范围
+### Current Signals
+- The inferred task type
+- The total number of applicable tasks
+- The actual number of invocations
+- The invocation of substitute tools
+- The file neighborhoods reached by the tool, the number of symbols, and the related-files coverage
 
-### 判定逻辑
-- 先根据工具使用模式推断任务类型：
-  - 文件搜索
-  - 代码搜索
-  - 文件读取
-  - 文件修改
-  - 命令执行
-  - 子任务委派
-  - web 搜索 / 获取
-- 对每个工具计算：
+### Decision Logic
+- The task type is first inferred from the tool usage pattern:
+  - File search
+  - Code search
+  - File reading
+  - File modification
+  - Command execution
+  - Subtask delegation
+  - web search / fetch
+- For each tool, compute:
   - `callRate = actualCallCount / suitableTaskCount`
-- 任务机会不再只由工具名反推；多文件相关修改、跨邻域操作、符号密集结果也会增加相应工具的“应被调用机会”
+- Task opportunities are no longer inferred solely from tool names; multi-file related modifications, cross-neighborhood operations, and symbol-dense results also increase the corresponding tool's "opportunities on which it ought to have been invoked"
 
-### 当前阈值
-- Warning：`callRate < 0.30`
-- Error：`callRate < 0.15`
-- 接近阈值预警：`0.30 - 0.35`
+### Current Thresholds
+- Warning: `callRate < 0.30`
+- Error: `callRate < 0.15`
+- Near-threshold prewarn: `0.30 - 0.35`
 
-### 扣分
-- Warning：`1.0`
-- Error：`2.0`
+### Penalty
+- Warning: `1.0`
+- Error: `2.0`
 
-### 误报控制
-- 仅在适用任务数足够多时统计
-- 同时看是否被替代工具大幅覆盖
+### False Positive Control
+- Statistics are computed only when the number of applicable tasks is sufficiently large
+- Whether the tool is largely covered by substitute tools is also taken into account
 
-### 整改方向
-- 改进工具描述
-- 增加示例
-- 在适用场景中主动提示工具使用
+### Remediation Direction
+- Improve the tool descriptions
+- Add examples
+- Actively hint at the use of the tool in the applicable scenarios
 
 ---
 
-## 三、当前 11 个基准与 AST 的关系
+## III. The Relationship Between the Current 11 Benchmarks and the AST
 
-### 强依赖 AST / 项目关系的基准
+### Benchmarks Strongly Dependent on the AST / Project Relations
 - Dead Step
 - Duplicate Step
 - Wrapper Workflow
 - Long Chain
 - Interface Inconsistency
 
-### 主要依赖行为统计或上下文统计的基准
+### Benchmarks That Rely Mainly on Behavioral or Contextual Statistics
 - Ghost Context
 - Oversized Rules
 - Context Thrashing
@@ -517,35 +517,35 @@
 - Context Coupling
 - Weak Tool
 
-Context Chain 增强：
-- 当前实现已引入 [ContextChainAnalyzer](./src/analyzers/ContextChainAnalyzer.ts)，直接基于 `parentUuid` 恢复每个 step 的真实上下文链。
-- `Ghost Context`、`Dead Step`、`Context Thrashing` 不再只依赖“按时间向后看 N 步”或“累计所有历史 token”的粗粒度近似，而是优先使用真实祖先链 / 后代链判断上下文占用与复用。
-- 这会降低分支切换、 sibling message、无关后续 chatter 对基准结果的干扰。
+Context Chain enhancement:
+- The current implementation has already introduced the [ContextChainAnalyzer](./src/analyzers/ContextChainAnalyzer.ts), which recovers the true context chain of each step directly from `parentUuid`.
+- `Ghost Context`, `Dead Step`, and `Context Thrashing` no longer rely solely on the coarse-grained approximations of "looking N steps forward in time" or "accumulating all historical tokens"; instead they give priority to the true ancestor chain / descendant chain when judging context occupancy and reuse.
+- This reduces the interference of branch switching, sibling messages, and unrelated subsequent chatter on the benchmark results.
 
-说明：
-- 不是所有基准都需要强行接入 AST。
-- 当前策略是：只有当 AST 能显著提升“是否真正发生代码关联、符号关联、模块切换、代码邻域一致性”的判断质量时，才接入 AST。
+Notes:
+- Not every benchmark needs to be forcibly wired to the AST.
+- The current policy is as follows: the AST is wired in only when it significantly improves the judgment quality of "whether a genuine code association, symbol association, module switch, or code neighborhood consistency has actually occurred".
 
 ---
 
-## 四、当前配置与输出入口
+## IV. Current Configuration and Output Entry Points
 
-### 配置文件
+### Configuration File
 - [config/project-analysis.config.json](./config/project-analysis.config.json)
 
-### 关键输出
+### Key Outputs
 - [file-graph.json](./output/file-graph.json)
 - [project-ast.json](./output/project-ast.json)
 - [prewarn.json](./output/prewarn.json)
 
-### 相关文档
+### Related Documents
 - [benchmark_specs.md](./docs/benchmark_specs.md)
 - [benchmark_evaluation_guide.md](./docs/benchmark_evaluation_guide.md)
 
 ---
 
-## 五、建议的后续补强
+## V. Recommended Follow-Up Reinforcements
 
-- 给 `WeakTool` 接入项目 AST，把“适用任务”的判定从纯工具模式推断提升到代码关系机会识别。
-- 补充每个 detector 的样例输入/样例 issue 输出，形成可直接复验的 benchmark case 文档。
-- 给 11 个基准增加“基础版 / AST 增强版”的信号对照表，方便做版本说明。
+- Wire the project AST into `WeakTool`, so as to upgrade the determination of "applicable tasks" from purely tool-pattern inference to code-relation opportunity identification.
+- Add sample inputs / sample issue outputs for each detector, forming a benchmark case document that can be directly re-verified.
+- Add a "base version / AST-enhanced version" signal comparison table for the 11 benchmarks, so as to facilitate version documentation.

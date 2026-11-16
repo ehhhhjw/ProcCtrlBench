@@ -8,10 +8,10 @@ import { writePrewarn } from '../utils/Prewarn';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 工具调用链检测器
- * 检测两种问题:
- * 1. Repetitive Chain: 同一工具连续调用过多
- * 2. Cyclic Chain: 工具调用出现循环
+ * Tool call chain detector
+ * Detects two kinds of problems:
+ * 1. Repetitive Chain: the same tool is called too many times in a row
+ * 2. Cyclic Chain: tool calls form a cycle
  */
 export class ToolChainDetector implements IDetector {
   readonly name = 'ToolChainDetector';
@@ -39,11 +39,11 @@ export class ToolChainDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 检测重复调用链
+    // Detect repetitive call chains
     const repetitiveIssues = await this.detectRepetitiveChain();
     issues.push(...repetitiveIssues);
 
-    // 检测循环调用链
+    // Detect cyclic call chains
     const cyclicIssues = await this.detectCyclicChain();
     issues.push(...cyclicIssues);
 
@@ -51,12 +51,12 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 检测重复调用链
+   * Detect repetitive call chains
    */
   private async detectRepetitiveChain(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 获取按时间排序的所有工具调用
+    // Get all tool calls sorted by time
     const toolUses = Array.from(this.sessionData.toolUses.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
@@ -74,12 +74,12 @@ export class ToolChainDetector implements IDetector {
         chainInputs.push(toolUse.input);
         chainToolUses.push(toolUse);
       } else {
-        // 检查前一个链
-        // 临近阈值时写预警（帮助模型自调）
+        // Check the previous chain
+        // Write a prewarn when nearing the threshold (helps the model self-correct)
         if (consecutiveCount === this.config.thresholds.toolChain.repetitiveWarningCount - 1) {
           writePrewarn({
             metric: 'toolCallChain',
-            message: `接近重复调用阈值: ${currentTool} 连续 ${consecutiveCount} 次`,
+            message: `near duplicate-call threshold: ${currentTool} ${consecutiveCount} times in a row`,
             details: { tool: currentTool, count: consecutiveCount },
           });
         }
@@ -96,17 +96,17 @@ export class ToolChainDetector implements IDetector {
             issues.push({
               metric: 'toolCallChain',
               severity,
-              message: `检测到重复工具调用链: ${currentTool} 连续调用 ${consecutiveCount} 次`,
+              message: `Detected duplicate tool call chain: ${currentTool} called ${consecutiveCount} times in a row`,
               location: {
                 stepRange: [chainStart, i - 1],
               },
-              suggestion: `考虑使用更高效的方式。例如，如果是连续Read操作，可以先用Grep搜索，然后只读取相关文件`,
+              suggestion: `Consider a more efficient approach. For example, for consecutive Read operations, search with Grep first and then read only the relevant files`,
               evidence: {
                 type: 'strong',
                 details: {
                   toolName: currentTool,
                   consecutiveCount,
-                  inputs: chainInputs.slice(0, 3), // 只保留前3个示例
+                  inputs: chainInputs.slice(0, 3), // Keep only the first 3 examples
                 },
               },
               deduction,
@@ -114,7 +114,7 @@ export class ToolChainDetector implements IDetector {
           }
         }
 
-        // 重置计数
+        // Reset the counter
         currentTool = toolUse.name;
         consecutiveCount = 1;
         chainStart = i;
@@ -123,7 +123,7 @@ export class ToolChainDetector implements IDetector {
       }
     }
 
-    // 检查最后一个链
+    // Check the last chain
     if (consecutiveCount >= this.config.thresholds.toolChain.repetitiveWarningCount) {
       const exempt = this.checkRepetitiveExemption(currentTool, chainToolUses);
 
@@ -137,11 +137,11 @@ export class ToolChainDetector implements IDetector {
         issues.push({
           metric: 'toolCallChain',
           severity,
-          message: `检测到重复工具调用链: ${currentTool} 连续调用 ${consecutiveCount} 次`,
+          message: `Detected duplicate tool call chain: ${currentTool} called ${consecutiveCount} times in a row`,
           location: {
             stepRange: [chainStart, toolUses.length - 1],
           },
-          suggestion: `考虑使用更高效的方式`,
+          suggestion: `Consider a more efficient approach`,
           evidence: {
             type: 'strong',
             details: {
@@ -159,20 +159,20 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 检查重复调用豁免条件
+   * Check the exemption conditions for duplicate calls
    */
   private checkRepetitiveExemption(toolName: string, toolUses: ToolUseInfo[]): boolean {
-    // 豁免条件1: 输入对象显著不同
+    // Exemption 1: the input objects are significantly different
     if (this.hasSignificantlyDifferentInputs(toolUses.map(toolUse => toolUse.input))) {
       return true;
     }
 
-    // 豁免条件2: 属于合理批处理
+    // Exemption 2: it qualifies as reasonable batch processing
     if (this.isReasonableBatchProcessing(toolName, toolUses)) {
       return true;
     }
 
-    // 豁免条件3: 明确搜索阶段且范围收敛
+    // Exemption 3: it is clearly a search phase with a converging scope
     if (this.isConvergingSearch(toolName, toolUses)) {
       return true;
     }
@@ -181,24 +181,24 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 检查输入是否显著不同
+   * Check whether the inputs are significantly different
    */
   private hasSignificantlyDifferentInputs(inputs: any[]): boolean {
     if (inputs.length <= 1) return false;
 
-    // 计算输入的多样性
+    // Compute the diversity of the inputs
     const uniqueInputs = new Set(inputs.map(input => JSON.stringify(input)));
     const diversityRatio = uniqueInputs.size / inputs.length;
 
-    // 如果超过80%的输入是不同的,认为是合理的
+    // If more than 80% of the inputs are different, treat it as reasonable
     return diversityRatio > 0.8;
   }
 
   /**
-   * 检查是否是合理的批处理
+   * Check whether it is reasonable batch processing
    */
   private isReasonableBatchProcessing(toolName: string, toolUses: ToolUseInfo[]): boolean {
-    // 某些工具天然支持批处理
+    // Some tools naturally support batch processing
     const batchableTools = ['Write', 'Edit', 'Read'];
 
     if (!batchableTools.includes(toolName)) {
@@ -215,7 +215,7 @@ export class ToolChainDetector implements IDetector {
       return true;
     }
 
-    // 如果处于同一代码邻域内的渐进式批处理，也视为合理。
+    // Incremental batch processing within the same code neighborhood is also considered reasonable.
     if (!this.projectAst) {
       return false;
     }
@@ -229,10 +229,10 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 检查是否是收敛的搜索
+   * Check whether it is a converging search
    */
   private isConvergingSearch(toolName: string, toolUses: ToolUseInfo[]): boolean {
-    // 只对搜索相关工具检查
+    // Only check search-related tools
     const searchTools = ['Grep', 'Glob', 'Read'];
 
     if (!searchTools.includes(toolName)) {
@@ -260,18 +260,18 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 检测循环调用链
+   * Detect cyclic call chains
    */
   private async detectCyclicChain(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 获取按时间排序的所有工具调用
+    // Get all tool calls sorted by time
     const toolUses = Array.from(this.sessionData.toolUses.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
     const toolNames = toolUses.map(t => t.name);
 
-    // 检测A→B→A或A→B→C→A模式
+    // Detect A→B→A or A→B→C→A patterns
     const cycles = this.findCycles(toolNames);
 
     for (const cycle of cycles) {
@@ -285,13 +285,13 @@ export class ToolChainDetector implements IDetector {
 
         const deduction = severity === Severity.Error ? 2.5 : 1.0;
 
-        // 临近循环阈值时预警
+        // Prewarn when nearing the cyclic threshold
         if (cycle.cycleCount === this.config.thresholds.toolChain.cyclicWarningCount - 1) {
           try {
             const { writePrewarn } = require('../utils/Prewarn');
             writePrewarn({
               metric: 'toolCallChain',
-              message: `接近循环调用阈值: ${cycle.pattern.join('→')} 重复 ${cycle.cycleCount} 轮`,
+              message: `near cyclic-call threshold: ${cycle.pattern.join('→')} repeated for ${cycle.cycleCount} rounds`,
               details: { pattern: cycle.pattern, count: cycle.cycleCount },
             });
           } catch {}
@@ -300,11 +300,11 @@ export class ToolChainDetector implements IDetector {
         issues.push({
           metric: 'toolCallChain',
           severity,
-          message: `检测到循环工具调用: ${cycle.pattern.join('→')} 重复 ${cycle.cycleCount} 轮`,
+          message: `Detected cyclic tool calls: ${cycle.pattern.join('→')} repeated for ${cycle.cycleCount} rounds`,
           location: {
             stepRange: [cycle.startStep, cycle.endStep],
           },
-          suggestion: `工具调用出现循环可能表示任务陷入死循环或策略不当，建议重新设计执行策略`,
+          suggestion: `A cycle in tool calls may indicate that the task is stuck in an infinite loop or that the strategy is inappropriate; consider redesigning the execution strategy`,
           evidence: {
             type: 'strong',
             details: {
@@ -321,12 +321,12 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 查找循环模式
+   * Find cyclic patterns
    */
   private findCycles(toolNames: string[]): CyclicChainInfo[] {
     const cycles: CyclicChainInfo[] = [];
 
-    // 检测2-4个工具的循环模式
+    // Detect cyclic patterns of 2-4 tools
     for (let patternLength = 2; patternLength <= 4; patternLength++) {
       const detectedCycles = this.detectCyclePattern(toolNames, patternLength);
       cycles.push(...detectedCycles);
@@ -336,7 +336,7 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 检测指定长度的循环模式
+   * Detect cyclic patterns of a given length
    */
   private detectCyclePattern(toolNames: string[], patternLength: number): CyclicChainInfo[] {
     const cycles: CyclicChainInfo[] = [];
@@ -346,7 +346,7 @@ export class ToolChainDetector implements IDetector {
       let cycleCount = 1;
       let currentPos = i + patternLength;
 
-      // 检查后续是否重复该模式
+      // Check whether the pattern repeats afterwards
       while (currentPos + patternLength <= toolNames.length) {
         const nextSegment = toolNames.slice(currentPos, currentPos + patternLength);
 
@@ -366,7 +366,7 @@ export class ToolChainDetector implements IDetector {
           endStep: currentPos - 1,
         });
 
-        // 跳过已检测的循环
+        // Skip the cycle that has already been detected
         i = currentPos - 1;
       }
     }
@@ -375,7 +375,7 @@ export class ToolChainDetector implements IDetector {
   }
 
   /**
-   * 比较两个数组是否相等
+   * Compare whether two arrays are equal
    */
   private arraysEqual(a: string[], b: string[]): boolean {
     if (a.length !== b.length) return false;

@@ -186,7 +186,7 @@ test('defaultStratumKey combines benchmark with the outcome bucket', () => {
 
 test('splitAnnotatedCases reproduces the paper 80/40/80 partition on 200 cases', () => {
   const cases = [];
-  // 100 SWE / 40 Android / 60 Terminal，各来源内成败对半
+  // 100 SWE / 40 Android / 60 Terminal, with an even success/failure split within each source
   const composition = [
     ['swe-bench-verified', 100],
     ['android-bench', 40],
@@ -206,7 +206,7 @@ test('splitAnnotatedCases reproduces the paper 80/40/80 partition on 200 cases',
   assert.equal(result.counts.evaluation, PAPER_SPLIT_SIZES.evaluation);
   assert.deepEqual(result.notes, [], 'an exactly sized set needs no rescaling note');
 
-  // 每个样本恰好落在一个划分
+  // Every case lands in exactly one split
   assert.equal(Object.keys(result.splitByCaseId).length, 200);
 });
 
@@ -237,7 +237,7 @@ test('splitAnnotatedCases keeps every stratum represented in each split', () => 
     sizes: { development: 24, calibration: 12, evaluation: 24 },
   });
 
-  // 3 来源 x 2 成败 = 6 个分层，每个划分都应覆盖全部分层
+  // 3 sources x 2 outcomes = 6 strata; every split should cover all strata
   for (const split of ['development', 'calibration', 'evaluation']) {
     assert.equal(
       Object.keys(result.stratumCounts[split]).length,

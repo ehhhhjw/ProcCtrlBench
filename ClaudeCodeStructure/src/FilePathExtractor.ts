@@ -3,13 +3,13 @@ import * as path from 'path';
 import { JsonlEntry } from './types';
 
 /**
- * 从 JSONL 文件中提取所有文件路径
+ * Extracts all file paths from a JSONL file
  */
 export class FilePathExtractor {
   /**
-   * 从 JSONL 文件中提取所有唯一的文件路径
-   * @param jsonlFilePath JSONL 文件路径
-   * @returns 所有唯一文件路径的数组
+   * Extracts all unique file paths from a JSONL file
+   * @param jsonlFilePath Path to the JSONL file
+   * @returns An array of all unique file paths
    */
   static extractAllFilePaths(jsonlFilePath: string): string[] {
     const filePaths = new Set<string>();
@@ -21,7 +21,7 @@ export class FilePathExtractor {
         const entry: JsonlEntry = JSON.parse(line);
         this.extractPathsFromEntry(entry, filePaths);
       } catch (error) {
-        console.error('解析 JSON 行失败:', error);
+        console.error('Failed to parse JSON line:', error);
       }
     }
 
@@ -29,37 +29,37 @@ export class FilePathExtractor {
   }
 
   /**
-   * 从单个 JSONL 条目中提取文件路径
+   * Extracts file paths from a single JSONL entry
    */
   private static extractPathsFromEntry(entry: JsonlEntry, filePaths: Set<string>): void {
-    // 处理 user 类型的消息
+    // Handle messages of type user
     if (entry.type === 'user' && entry.message?.content) {
       this.extractPathsFromContent(entry.message.content, filePaths);
     }
 
-    // 处理 assistant 类型的消息
+    // Handle messages of type assistant
     if (entry.type === 'assistant' && entry.message?.content) {
       this.extractPathsFromContent(entry.message.content, filePaths);
     }
 
-    // 处理 message 类型（包含 user/assistant/system/attachment）
+    // Handle the message type (covers user/assistant/system/attachment)
     if (entry.type === 'message' && 'message' in entry && entry.message?.content) {
       this.extractPathsFromContent(entry.message.content, filePaths);
     }
 
-    // 处理 tool-use 类型
+    // Handle the tool-use type
     if (entry.type === 'tool-use' && 'toolUse' in entry) {
       this.extractPathsFromToolInput(entry.toolUse.input, filePaths);
     }
 
-    // 处理 tool-result 类型
+    // Handle the tool-result type
     if (entry.type === 'tool-result' && 'toolResult' in entry) {
       this.extractPathsFromToolResult(entry.toolResult.content, filePaths);
     }
 
-    // 处理 file-history-snapshot 类型
+    // Handle the file-history-snapshot type
     if (entry.type === 'file-history-snapshot') {
-      // 提取 file-history-snapshot 中的所有字段
+      // Extract all fields within file-history-snapshot
       const entryAny = entry as any;
       if (entryAny.files && Array.isArray(entryAny.files)) {
         for (const file of entryAny.files) {
@@ -68,13 +68,13 @@ export class FilePathExtractor {
           }
         }
       }
-      // 也检查其他可能包含路径的字段
+      // Also check other fields that may contain paths
       this.extractPathsFromObject(entryAny, filePaths);
     }
   }
 
   /**
-   * 从任意对象中递归提取可能的文件路径
+   * Recursively extracts possible file paths from an arbitrary object
    */
   private static extractPathsFromObject(obj: any, filePaths: Set<string>): void {
     if (!obj || typeof obj !== 'object') return;
@@ -97,42 +97,42 @@ export class FilePathExtractor {
   }
 
   /**
-   * 从消息内容中提取文件路径
+   * Extracts file paths from message content
    */
   private static extractPathsFromContent(content: any, filePaths: Set<string>): void {
     if (Array.isArray(content)) {
       for (const item of content) {
         if (typeof item === 'object' && item !== null) {
-          // 处理 tool_use 类型
+          // Handle the tool_use type
           if (item.type === 'tool_use' && item.input) {
             this.extractPathsFromToolInput(item.input, filePaths);
           }
-          // 处理 tool_result 类型
+          // Handle the tool_result type
           if (item.type === 'tool_result' && item.content) {
             this.extractPathsFromToolResult(item.content, filePaths);
           }
         }
       }
     } else if (typeof content === 'string') {
-      // 从字符串中提取路径（使用正则表达式）
+      // Extract paths from the string (using regular expressions)
       this.extractPathsFromString(content, filePaths);
     }
   }
 
   /**
-   * 从工具输入中提取文件路径
+   * Extracts file paths from tool input
    */
   private static extractPathsFromToolInput(input: Record<string, any>, filePaths: Set<string>): void {
-    // 常见的路径参数名
+    // Common path parameter names
     const pathKeys = ['file_path', 'path', 'directory', 'dir', 'source', 'destination', 'target'];
-    
+
     for (const key of pathKeys) {
       if (input[key] && typeof input[key] === 'string') {
         filePaths.add(input[key]);
       }
     }
 
-    // 递归处理嵌套对象
+    // Recursively handle nested objects
     for (const value of Object.values(input)) {
       if (typeof value === 'object' && value !== null) {
         if (Array.isArray(value)) {
@@ -149,7 +149,7 @@ export class FilePathExtractor {
   }
 
   /**
-   * 从工具结果中提取文件路径
+   * Extracts file paths from tool results
    */
   private static extractPathsFromToolResult(content: any, filePaths: Set<string>): void {
     if (typeof content === 'string') {
@@ -170,10 +170,10 @@ export class FilePathExtractor {
   }
 
   /**
-   * 从字符串中提取文件路径
+   * Extracts file paths from a string
    */
   private static extractPathsFromString(text: string, filePaths: Set<string>): void {
-    // 匹配 XML 标签中的路径
+    // Match paths inside XML tags
     const xmlPathRegex = /<(?:file_)?path>(.*?)<\/(?:file_)?path>/g;
     let match;
     while ((match = xmlPathRegex.exec(text)) !== null) {
@@ -182,7 +182,7 @@ export class FilePathExtractor {
       }
     }
 
-    // 匹配绝对路径 (Unix/Linux/Mac)
+    // Match absolute paths (Unix/Linux/Mac)
     const unixPathRegex = /(?:^|\s)(\/([\w\-\.]+\/)*[\w\-\.]+)/g;
     while ((match = unixPathRegex.exec(text)) !== null) {
       if (match[1] && this.looksLikeFilePath(match[1])) {
@@ -190,7 +190,7 @@ export class FilePathExtractor {
       }
     }
 
-    // 匹配相对路径
+    // Match relative paths
     const relativePathRegex = /(?:^|\s)((?:\.\.?\/)?(?:[\w\-\.]+\/)+[\w\-\.]+)/g;
     while ((match = relativePathRegex.exec(text)) !== null) {
       if (match[1] && this.looksLikeFilePath(match[1])) {
@@ -200,28 +200,28 @@ export class FilePathExtractor {
   }
 
   /**
-   * 判断字符串是否看起来像文件路径
+   * Determines whether a string looks like a file path
    */
   private static looksLikeFilePath(str: string): boolean {
-    // 排除太短的字符串
+    // Exclude strings that are too short
     if (str.length < 3) return false;
-    
-    // 排除纯数字
+
+    // Exclude pure numbers
     if (/^\d+$/.test(str)) return false;
-    
-    // 排除 URL
+
+    // Exclude URLs
     if (str.startsWith('http://') || str.startsWith('https://')) return false;
-    
-    // 包含路径分隔符或文件扩展名
+
+    // Must contain a path separator or a file extension
     return str.includes('/') || str.includes('\\') || /\.\w+$/.test(str);
   }
 
   /**
-   * 按文件类型分组文件路径
+   * Groups file paths by file type
    */
   static groupPathsByExtension(filePaths: string[]): Map<string, string[]> {
     const grouped = new Map<string, string[]>();
-    
+
     for (const filePath of filePaths) {
       const ext = path.extname(filePath) || '(no extension)';
       if (!grouped.has(ext)) {
@@ -229,12 +229,12 @@ export class FilePathExtractor {
       }
       grouped.get(ext)!.push(filePath);
     }
-    
+
     return grouped;
   }
 
   /**
-   * 过滤出特定扩展名的文件路径
+   * Filters out file paths with specific extensions
    */
   static filterByExtension(filePaths: string[], extensions: string[]): string[] {
     const extSet = new Set(extensions.map(ext => ext.startsWith('.') ? ext : `.${ext}`));
@@ -245,18 +245,18 @@ export class FilePathExtractor {
   }
 
   /**
-   * 获取所有目录路径（去重）
+   * Gets all directory paths (deduplicated)
    */
   static extractDirectories(filePaths: string[]): string[] {
     const directories = new Set<string>();
-    
+
     for (const filePath of filePaths) {
       const dir = path.dirname(filePath);
       if (dir && dir !== '.') {
         directories.add(dir);
       }
     }
-    
+
     return Array.from(directories).sort();
   }
 }

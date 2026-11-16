@@ -219,10 +219,10 @@ async function main() {
     const issues = await new ThrashingDetector(createSession(), DEFAULT_EVALUATION_CONFIG).detect();
     const issue = issues.find((item) => item.metric === 'contextThrashing' && item.location?.messageUuid === 'm0');
     if (issue) {
-      console.error('压缩前已在相关代码邻域继续执行时，不应误判为 thrashing:', JSON.stringify(issue, null, 2));
+      console.error('When execution continued in the related code neighborhood before compaction, it must not be misreported as thrashing:', JSON.stringify(issue, null, 2));
       process.exit(1);
     }
-    console.log('[ok] thrashing-context-reuse: 压缩前相关代码邻域已复用时不误判 thrashing');
+    console.log('[ok] thrashing-context-reuse: no false thrashing when the related code neighborhood was reused before compaction');
   } finally {
     restoreFile(projectAstPath, backupPath);
   }

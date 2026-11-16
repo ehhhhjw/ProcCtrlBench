@@ -35,29 +35,29 @@ async function main() {
   if (fs.existsSync(prewarn)) fs.unlinkSync(prewarn);
 
   const s = emptySession();
-  // 构造连续5次相同工具调用（默认重复链预警阈值为6，接近阈值应写预警）
+  // Build 5 consecutive identical tool calls (default duplicate-chain prewarn threshold is 6; near threshold should write a prewarn)
   for (let i = 0; i < 5; i++) {
     const id = `TU${i}`;
     const t: ToolUseInfo = { id, name: 'Read', input: { file_path: `f${i}.ts` }, timestamp: i, messageId: `m${i}`, messageUuid: `m${i}`, hasResult: false } as any;
     s.toolUses.set(id, t);
   }
-  // 切换工具，促使检测器结算前一段链
+  // Switch tools to make the detector settle the preceding chain
   s.toolUses.set('TU5', { id: 'TU5', name: 'Grep', input: {}, timestamp: 6, messageId: 'm5', messageUuid: 'm5', hasResult: false } as any);
 
   const det = new ToolChainDetector(s, DEFAULT_EVALUATION_CONFIG);
   await det.detect();
 
   if (!fs.existsSync(prewarn)) {
-    console.error('预期应产生预警(prewarn.json)，但未找到');
+    console.error('Expected a prewarn (prewarn.json), but none was found');
     process.exit(1);
   }
   const arr = JSON.parse(fs.readFileSync(prewarn, 'utf-8'));
-  const hit = arr.some((x: any) => x.metric === 'toolCallChain' && String(x.message || '').includes('接近重复调用阈值'));
+  const hit = arr.some((x: any) => x.metric === 'toolCallChain' && String(x.message || '').includes('near duplicate-call threshold'));
   if (!hit) {
-    console.error('未发现“接近重复调用阈值”的预警记录');
+    console.error('No prewarn record found for "near duplicate-call threshold"');
     process.exit(1);
   }
-  console.log('[ok] toolchain-prewarn: 产生接近重复链阈值的预警');
+  console.log('[ok] toolchain-prewarn: produced a near-duplicate-chain-threshold prewarn');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

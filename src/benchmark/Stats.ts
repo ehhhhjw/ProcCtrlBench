@@ -12,7 +12,7 @@ export function variance(xs: number[]): number {
   return s / (xs.length - 1);
 }
 
-/** 样本标准差（贝塞尔校正，n-1） */
+/** Sample standard deviation (Bessel-corrected, n-1) */
 export function sampleStdDev(xs: number[]): number {
   return Math.sqrt(variance(xs));
 }
@@ -28,14 +28,14 @@ export function cohensD(a: number[], b: number[]): number {
   return (ma - mb) / sp;
 }
 
-/** 均匀分布随机数生成器，签名与 Math.random 一致 */
+/** Uniform random number generator, with the same signature as Math.random */
 export type Rng = () => number;
 
 /**
- * 可复现的随机数生成器（mulberry32）。
+ * Reproducible random number generator (mulberry32).
  *
- * 论文中的 bootstrap 结果需要可复现，因此凡涉及重采样的函数都应显式传入
- * 种子化 rng，而不是依赖全局 Math.random。
+ * The bootstrap results in the paper must be reproducible, so every function that resamples
+ * should be passed a seeded rng explicitly rather than relying on the global Math.random.
  */
 export function createSeededRng(seed: number): Rng {
   let state = seed >>> 0;
@@ -69,7 +69,7 @@ export function bootstrapCI(
   return { mean: m, lo, hi };
 }
 
-/** 秩变换，并列取平均秩 */
+/** Rank transform; ties receive the average rank */
 export function rank(values: number[]): number[] {
   const sorted = values
     .map((value, index) => ({ value, index }))

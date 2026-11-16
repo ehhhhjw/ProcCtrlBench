@@ -1,5 +1,5 @@
 /**
- * 内容相似度分析器
+ * Content similarity analyzer
  */
 export class ContentSimilarityAnalyzer {
   private static readonly MAX_LEVENSHTEIN_LENGTH = 4000;
@@ -7,7 +7,7 @@ export class ContentSimilarityAnalyzer {
   private static readonly LARGE_TEXT_TOKEN_LIMIT = 512;
 
   /**
-   * 计算两个字符串的相似度
+   * Computes the similarity between two strings
    */
   static calculateSimilarity(str1: string, str2: string): number {
     if (str1 === str2) return 1.0;
@@ -21,7 +21,7 @@ export class ContentSimilarityAnalyzer {
       return this.calculateLargeTextSimilarity(str1, str2);
     }
 
-    // 使用Levenshtein距离的归一化版本
+    // Use the normalized form of the Levenshtein distance
     const distance = this.levenshteinDistance(str1, str2);
     const maxLength = Math.max(str1.length, str2.length);
 
@@ -54,7 +54,7 @@ export class ContentSimilarityAnalyzer {
   }
 
   /**
-   * 计算两个对象的相似度
+   * Computes the similarity between two objects
    */
   static calculateObjectSimilarity(obj1: any, obj2: any): number {
     const str1 = JSON.stringify(obj1, null, 0);
@@ -64,18 +64,18 @@ export class ContentSimilarityAnalyzer {
   }
 
   /**
-   * Levenshtein距离算法
+   * Levenshtein distance algorithm
    */
   private static levenshteinDistance(str1: string, str2: string): number {
     const len1 = str1.length;
     const len2 = str2.length;
 
-    // 创建距离矩阵
+    // Create the distance matrix
     const matrix: number[][] = Array(len1 + 1)
       .fill(null)
       .map(() => Array(len2 + 1).fill(0));
 
-    // 初始化第一行和第一列
+    // Initialize the first row and the first column
     for (let i = 0; i <= len1; i++) {
       matrix[i][0] = i;
     }
@@ -83,15 +83,15 @@ export class ContentSimilarityAnalyzer {
       matrix[0][j] = j;
     }
 
-    // 计算距离
+    // Compute the distances
     for (let i = 1; i <= len1; i++) {
       for (let j = 1; j <= len2; j++) {
         const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
 
         matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,      // 删除
-          matrix[i][j - 1] + 1,      // 插入
-          matrix[i - 1][j - 1] + cost // 替换
+          matrix[i - 1][j] + 1,      // deletion
+          matrix[i][j - 1] + 1,      // insertion
+          matrix[i - 1][j - 1] + cost // substitution
         );
       }
     }
@@ -100,18 +100,18 @@ export class ContentSimilarityAnalyzer {
   }
 
   /**
-   * 计算余弦相似度(用于文本向量)
+   * Computes cosine similarity (for text vectors)
    */
   static calculateCosineSimilarity(text1: string, text2: string): number {
     const words1 = this.tokenize(text1);
     const words2 = this.tokenize(text2);
 
-    // 构建词袋
+    // Build the bag of words
     const allWords = new Set([...words1, ...words2]);
     const vector1 = Array.from(allWords).map(word => words1.filter(w => w === word).length);
     const vector2 = Array.from(allWords).map(word => words2.filter(w => w === word).length);
 
-    // 计算余弦相似度
+    // Compute the cosine similarity
     const dotProduct = vector1.reduce((sum, val, i) => sum + val * vector2[i], 0);
     const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val * val, 0));
     const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val * val, 0));
@@ -122,7 +122,7 @@ export class ContentSimilarityAnalyzer {
   }
 
   /**
-   * 分词
+   * Tokenizes text
    */
   private static tokenize(text: string): string[] {
     return text
@@ -133,20 +133,20 @@ export class ContentSimilarityAnalyzer {
   }
 
   /**
-   * 结构化相似度(用于JSON对象)
+   * Structural similarity (for JSON objects)
    */
   static calculateStructuralSimilarity(obj1: any, obj2: any): number {
-    // 比较对象的结构
+    // Compare the structure of the objects
     const keys1 = Object.keys(obj1 || {}).sort();
     const keys2 = Object.keys(obj2 || {}).sort();
 
-    // 键的相似度
+    // Key similarity
     const keySimilarity = this.calculateSimilarity(
       keys1.join(','),
       keys2.join(',')
     );
 
-    // 值的相似度
+    // Value similarity
     const commonKeys = keys1.filter(k => keys2.includes(k));
     if (commonKeys.length === 0) return keySimilarity;
 
@@ -164,7 +164,7 @@ export class ContentSimilarityAnalyzer {
 
     valueSimilarity /= commonKeys.length;
 
-    // 综合相似度
+    // Combined similarity
     return (keySimilarity + valueSimilarity) / 2;
   }
 }

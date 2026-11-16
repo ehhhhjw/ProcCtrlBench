@@ -1,8 +1,8 @@
 #!/usr/bin/env ts-node
 
 /**
- * 快速测试脚本
- * 用于快速验证项目的核心功能
+ * Quick test script
+ * Quickly validates the project's core functionality
  */
 
 import { AgentEvaluator } from '../src/AgentEvaluator';
@@ -21,7 +21,7 @@ class QuickTester {
   private results: TestResult[] = [];
 
   async runAllTests() {
-    console.log('🚀 开始快速测试...\n');
+    console.log('🚀 Starting quick tests...\n');
 
     await this.testBasicFunctionality();
     await this.testRealSessionData();
@@ -32,23 +32,23 @@ class QuickTester {
   }
 
   /**
-   * 测试 1: 基本功能测试
+   * Test 1: Basic functionality
    */
   async testBasicFunctionality() {
-    const testName = '基本功能测试';
+    const testName = 'Basic functionality test';
     const startTime = Date.now();
 
     try {
       console.log(`📋 ${testName}...`);
 
-      // 检查核心类是否可以实例化
+      // Check whether the core class can be instantiated
       const evaluator = new AgentEvaluator();
       
       if (!evaluator) {
-        throw new Error('无法创建 AgentEvaluator 实例');
+        throw new Error('Unable to create an AgentEvaluator instance');
       }
 
-      console.log('  ✅ AgentEvaluator 实例化成功');
+      console.log('  ✅ AgentEvaluator instantiated successfully');
 
       this.results.push({
         name: testName,
@@ -57,7 +57,7 @@ class QuickTester {
       });
 
     } catch (error) {
-      console.log(`  ❌ 失败: ${error.message}`);
+      console.log(`  ❌ Failed: ${error.message}`);
       this.results.push({
         name: testName,
         passed: false,
@@ -68,16 +68,16 @@ class QuickTester {
   }
 
   /**
-   * 测试 2: 真实会话数据测试
+   * Test 2: Real session data
    */
   async testRealSessionData() {
-    const testName = '真实会话数据测试';
+    const testName = 'Real session data test';
     const startTime = Date.now();
 
     try {
       console.log(`\n📋 ${testName}...`);
 
-      // 查找测试数据文件
+      // Find a test data file
       const testDataPaths = [
         'ClaudeCodeStructure/tests/a3d0cc87-cbb3-450a-be14-e3d86f4b12ba.jsonl',
         'ClaudeCodeStructure/tests/sample.jsonl',
@@ -93,36 +93,36 @@ class QuickTester {
       }
 
       if (!testDataPath) {
-        throw new Error('未找到测试数据文件');
+        throw new Error('Test data file not found');
       }
 
-      console.log(`  📁 使用测试文件: ${testDataPath}`);
+      console.log(`  📁 Using test file: ${testDataPath}`);
 
       const evaluator = new AgentEvaluator();
       const result = await evaluator.evaluateSession(testDataPath);
 
-      // 验证结果结构
+      // Validate the result structure
       if (!result) {
-        throw new Error('评估结果为空');
+        throw new Error('Evaluation result is empty');
       }
 
       if (typeof result.overallScore !== 'number') {
-        throw new Error('总分不是数字类型');
+        throw new Error('Overall score is not a number');
       }
 
       if (result.overallScore < 0 || result.overallScore > 100) {
-        throw new Error(`总分超出范围: ${result.overallScore}`);
+        throw new Error(`Overall score is out of range: ${result.overallScore}`);
       }
 
       if (!Array.isArray(result.evaluations)) {
-        throw new Error('评估结果不是数组');
+        throw new Error('Evaluation result is not an array');
       }
 
-      console.log(`  ✅ 评估成功`);
-      console.log(`  📊 总分: ${result.overallScore.toFixed(2)}`);
-      console.log(`  📈 评估维度数: ${result.evaluations.length}`);
+      console.log(`  ✅ Evaluation succeeded`);
+      console.log(`  📊 Overall score: ${result.overallScore.toFixed(2)}`);
+      console.log(`  📈 Evaluation dimensions: ${result.evaluations.length}`);
 
-      // 显示各维度得分
+      // Display each dimension's score
       result.evaluations.forEach(evaluation => {
         console.log(`     - ${evaluation.dimension}: ${evaluation.score.toFixed(2)}`);
       });
@@ -138,7 +138,7 @@ class QuickTester {
       });
 
     } catch (error) {
-      console.log(`  ❌ 失败: ${error.message}`);
+      console.log(`  ❌ Failed: ${error.message}`);
       this.results.push({
         name: testName,
         passed: false,
@@ -149,10 +149,10 @@ class QuickTester {
   }
 
   /**
-   * 测试 3: 错误处理测试
+   * Test 3: Error handling
    */
   async testErrorHandling() {
-    const testName = '错误处理测试';
+    const testName = 'Error handling test';
     const startTime = Date.now();
 
     try {
@@ -160,26 +160,26 @@ class QuickTester {
 
       const evaluator = new AgentEvaluator();
 
-      // 测试不存在的文件
+      // Test a nonexistent file
       try {
         await evaluator.evaluateSession('nonexistent-file.jsonl');
-        throw new Error('应该抛出文件不存在错误');
+        throw new Error('Expected a missing-file error');
       } catch (error) {
-        if (error.message.includes('应该抛出')) {
+        if (error.message.includes('Expected')) {
           throw error;
         }
-        console.log('  ✅ 正确处理文件不存在错误');
+        console.log('  ✅ Missing-file error handled correctly');
       }
 
-      // 测试空路径
+      // Test an empty path
       try {
         await evaluator.evaluateSession('');
-        throw new Error('应该抛出空路径错误');
+        throw new Error('Expected an empty-path error');
       } catch (error) {
-        if (error.message.includes('应该抛出')) {
+        if (error.message.includes('Expected')) {
           throw error;
         }
-        console.log('  ✅ 正确处理空路径错误');
+        console.log('  ✅ Empty-path error handled correctly');
       }
 
       this.results.push({
@@ -189,7 +189,7 @@ class QuickTester {
       });
 
     } catch (error) {
-      console.log(`  ❌ 失败: ${error.message}`);
+      console.log(`  ❌ Failed: ${error.message}`);
       this.results.push({
         name: testName,
         passed: false,
@@ -200,20 +200,20 @@ class QuickTester {
   }
 
   /**
-   * 测试 4: 性能测试
+   * Test 4: Performance
    */
   async testPerformance() {
-    const testName = '性能测试';
+    const testName = 'Performance test';
     const startTime = Date.now();
 
     try {
       console.log(`\n📋 ${testName}...`);
 
-      // 查找测试数据文件
+      // Find the test data file
       const testDataPath = 'ClaudeCodeStructure/tests/a3d0cc87-cbb3-450a-be14-e3d86f4b12ba.jsonl';
 
       if (!fs.existsSync(testDataPath)) {
-        console.log('  ⚠️  跳过性能测试（未找到测试数据）');
+        console.log('  ⚠️  Skipping performance test (test data not found)');
         this.results.push({
           name: testName,
           passed: true,
@@ -223,11 +223,11 @@ class QuickTester {
         return;
       }
 
-      // 获取文件大小
+      // Get the file size
       const stats = fs.statSync(testDataPath);
       const fileSizeKB = stats.size / 1024;
 
-      console.log(`  📁 文件大小: ${fileSizeKB.toFixed(2)} KB`);
+      console.log(`  📁 File size: ${fileSizeKB.toFixed(2)} KB`);
 
       const evaluator = new AgentEvaluator();
       const perfStart = Date.now();
@@ -236,12 +236,12 @@ class QuickTester {
 
       const throughput = fileSizeKB / (perfDuration / 1000); // KB/s
 
-      console.log(`  ⏱️  处理时间: ${perfDuration}ms`);
-      console.log(`  🚀 吞吐量: ${throughput.toFixed(2)} KB/s`);
+      console.log(`  ⏱️  Processing time: ${perfDuration}ms`);
+      console.log(`  🚀 Throughput: ${throughput.toFixed(2)} KB/s`);
 
-      // 性能基准：应该在合理时间内完成
+      // Performance benchmark: should finish within a reasonable time
       if (perfDuration > 10000) {
-        throw new Error(`处理时间过长: ${perfDuration}ms`);
+        throw new Error(`Processing took too long: ${perfDuration}ms`);
       }
 
       this.results.push({
@@ -255,7 +255,7 @@ class QuickTester {
       });
 
     } catch (error) {
-      console.log(`  ❌ 失败: ${error.message}`);
+      console.log(`  ❌ Failed: ${error.message}`);
       this.results.push({
         name: testName,
         passed: false,
@@ -266,11 +266,11 @@ class QuickTester {
   }
 
   /**
-   * 打印测试结果
+   * Print test results
    */
   printResults() {
     console.log('\n' + '='.repeat(60));
-    console.log('📊 测试结果汇总');
+    console.log('📊 Test Results Summary');
     console.log('='.repeat(60));
 
     const passed = this.results.filter(r => r.passed).length;
@@ -282,28 +282,28 @@ class QuickTester {
       const duration = `${result.duration}ms`;
       console.log(`${icon} ${result.name.padEnd(30)} ${duration.padStart(10)}`);
       if (result.error) {
-        console.log(`   错误: ${result.error}`);
+        console.log(`   Error: ${result.error}`);
       }
     });
 
     console.log('='.repeat(60));
-    console.log(`总计: ${total} | 通过: ${passed} | 失败: ${failed}`);
-    console.log(`成功率: ${((passed / total) * 100).toFixed(2)}%`);
+    console.log(`Total: ${total} | Passed: ${passed} | Failed: ${failed}`);
+    console.log(`Success rate: ${((passed / total) * 100).toFixed(2)}%`);
     console.log('='.repeat(60));
 
     if (failed > 0) {
-      console.log('\n⚠️  存在失败的测试，请检查上述错误信息');
+      console.log('\n⚠️  Some tests failed; review the errors above');
       process.exit(1);
     } else {
-      console.log('\n🎉 所有测试通过！');
+      console.log('\n🎉 All tests passed!');
       process.exit(0);
     }
   }
 }
 
-// 运行测试
+// Run tests
 const tester = new QuickTester();
 tester.runAllTests().catch(error => {
-  console.error('测试运行失败:', error);
+  console.error('Test run failed:', error);
   process.exit(1);
 });

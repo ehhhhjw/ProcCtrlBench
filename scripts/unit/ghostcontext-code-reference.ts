@@ -204,10 +204,10 @@ async function main() {
     const issues = await new GhostContextDetector(createSession(), DEFAULT_EVALUATION_CONFIG).detect();
     const ghostIssue = issues.find((issue) => issue.metric === 'ghostContext' && issue.location?.messageUuid === 'm0');
     if (ghostIssue) {
-      console.error('相关文件已继续被使用时，不应误判为 ghostContext:', JSON.stringify(ghostIssue, null, 2));
+      console.error('When the related file keeps being used, it must not be misreported as ghostContext:', JSON.stringify(ghostIssue, null, 2));
       process.exit(1);
     }
-    console.log('[ok] ghostcontext-code-reference: 相关文件继续被使用时不误判 ghostContext');
+    console.log('[ok] ghostcontext-code-reference: no false ghostContext when the related file keeps being used');
   } finally {
     restoreFile(projectAstPath, backupPath);
   }

@@ -1,6 +1,6 @@
 /**
- * Agent执行过程评估系统
- * 主导出文件
+ * Agent execution process evaluation system
+ * Main export file
  */
 
 export { AgentEvaluator } from './AgentEvaluator';
@@ -47,12 +47,12 @@ export {
   resolveOutcomeMetric,
 } from './benchmark/ObservedBenchmarkExperiments';
 
-// 类型定义
+// Type definitions
 export * from './types/evaluation.types';
 export * from './types/metrics.types';
 export * from './types/project-analysis.types';
 
-// 配置
+// Configuration
 export { DEFAULT_EVALUATION_CONFIG } from './config/evaluation.config';
 export {
   applyCalibrationProfile,
@@ -66,7 +66,7 @@ export {
   writeBenchmarkLaunchArtifacts,
 } from './config/benchmark-run-config';
 
-// 评估器
+// Evaluators
 export { BaseEvaluator } from './evaluators/BaseEvaluator';
 export { ToolUseEfficiencyEvaluator } from './evaluators/ToolUseEfficiencyEvaluator';
 export { WorkflowArchitectureEvaluator } from './evaluators/WorkflowArchitectureEvaluator';
@@ -74,7 +74,7 @@ export { ContextManagementEvaluator } from './evaluators/ContextManagementEvalua
 export { ToolEcosystemEvaluator } from './evaluators/ToolEcosystemEvaluator';
 export { TaskOutcomeEvaluator } from './evaluators/TaskOutcomeEvaluator';
 
-// 检测器
+// Detectors
 export { ToolChainDetector } from './detectors/ToolChainDetector';
 export { DuplicateStepDetector } from './detectors/DuplicateStepDetector';
 export { LongChainDetector } from './detectors/LongChainDetector';
@@ -87,7 +87,7 @@ export { CouplingDetector } from './detectors/CouplingDetector';
 export { InterfaceConsistencyDetector } from './detectors/InterfaceConsistencyDetector';
 export { WeakToolDetector } from './detectors/WeakToolDetector';
 
-// 分析器
+// Analyzers
 export { EventStreamConverter } from './analyzers/EventStreamConverter';
 export { ContextChainAnalyzer } from './analyzers/ContextChainAnalyzer';
 export { ContentSimilarityAnalyzer } from './analyzers/ContentSimilarityAnalyzer';

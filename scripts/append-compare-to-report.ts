@@ -22,7 +22,7 @@ function main() {
     process.exit(1);
   }
   const compare = fs.readFileSync(comparePath, 'utf-8');
-  const section = `\n\n## 整改前/后对比\n\n${compare}\n`;
+  const section = `\n\n## Before/After Remediation Comparison\n\n${compare}\n`;
   fs.appendFileSync(target, section, 'utf-8');
   console.log('Appended compare summary to', target);
 }

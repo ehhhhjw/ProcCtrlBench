@@ -21,8 +21,8 @@ interface ToolContextProfile {
 }
 
 /**
- * 接口一致性检测器
- * 检测功能相似的工具，接口不一致
+ * Interface consistency detector
+ * Detects tools with similar functionality but inconsistent interfaces
  */
 export class InterfaceConsistencyDetector implements IDetector {
   readonly name = 'InterfaceConsistencyDetector';
@@ -31,7 +31,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   private ast?: AstAnalyzer;
   private projectAst?: ProjectAstLoader;
 
-  // 预定义的工具功能分组
+  // Predefined groups of tools by functionality
   private readonly toolClusters = {
     file_read: ['Read', 'Grep', 'Glob'],
     file_write: ['Write', 'Edit'],
@@ -68,7 +68,7 @@ export class InterfaceConsistencyDetector implements IDetector {
         if (analysis.interfaceRisk > 0.35 && analysis.interfaceRisk <= 0.4) {
           writePrewarn({
             metric: 'inconsistentToolInterface',
-            message: `接口差异接近阈值: ${(analysis.interfaceRisk * 100).toFixed(0)}%`,
+            message: `interface difference near threshold: ${(analysis.interfaceRisk * 100).toFixed(0)}%`,
             details: { cluster: clusterTools, semanticOverlap: analysis.semanticOverlap },
           });
         }
@@ -80,9 +80,9 @@ export class InterfaceConsistencyDetector implements IDetector {
           issues.push({
             metric: 'inconsistentToolInterface',
             severity,
-            message: `检测到工具接口不一致: ${clusterName}组的接口风险 ${(analysis.interfaceRisk * 100).toFixed(0)}%`,
+            message: `Detected inconsistent tool interface: interface risk of the ${clusterName} group is ${(analysis.interfaceRisk * 100).toFixed(0)}%`,
             location: {},
-            suggestion: `功能相似且作用于同一代码区域的工具应该有更一致的接口设计。考虑统一参数命名、返回结构与使用约定`,
+            suggestion: `Tools with similar functionality that operate on the same code area should have a more consistent interface design. Consider unifying parameter naming, return structures, and usage conventions`,
             evidence: {
               type: severity === Severity.Error ? 'strong' : 'medium',
               details: {
@@ -106,7 +106,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 收集使用过的工具
+   * Collect the tools that have been used
    */
   private collectUsedTools(): Map<string, ToolUseInfo[]> {
     const tools = new Map<string, ToolUseInfo[]>();
@@ -122,7 +122,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 分析工具集群的一致性
+   * Analyze the consistency of a tool cluster
    */
   private analyzeCluster(
     toolNames: string[],
@@ -166,7 +166,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 提取工具的 schema。
+   * Extract the schema of a tool.
    */
   private extractSchema(toolUses: ToolUseInfo[]): ToolSchemaSnapshot {
     const schema = {
@@ -222,7 +222,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 构建工具的代码上下文画像。
+   * Build the code context profile of a tool.
    */
   private buildContextProfile(toolUses: ToolUseInfo[]): ToolContextProfile {
     const profile: ToolContextProfile = {
@@ -277,7 +277,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 计算 schema 差异。
+   * Calculate the schema difference.
    */
   private calculateSchemaDifference(schemas: ToolSchemaSnapshot[]): number {
     if (schemas.length < 2) {
@@ -325,7 +325,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 计算工具在代码语义空间中的重合度。
+   * Calculate how much the tools overlap in the code semantic space.
    */
   private calculateSemanticOverlap(profiles: ToolContextProfile[]): number {
     if (profiles.length < 2) {
@@ -363,7 +363,7 @@ export class InterfaceConsistencyDetector implements IDetector {
   }
 
   /**
-   * 分析工具使用的分散度。
+   * Analyze the dispersion of tool usage.
    */
   private analyzeUsageDispersion(usedTools: Map<string, ToolUseInfo[]>): DetectionIssue[] {
     const issues: DetectionIssue[] = [];
@@ -398,7 +398,7 @@ export class InterfaceConsistencyDetector implements IDetector {
         if (effectiveDispersion > 0.75 && effectiveDispersion <= 0.8) {
           writePrewarn({
             metric: 'inconsistentToolInterface',
-            message: `工具使用分散度接近阈值: ${(effectiveDispersion * 100).toFixed(0)}%`,
+            message: `tool usage dispersion near threshold: ${(effectiveDispersion * 100).toFixed(0)}%`,
             details: { cluster: clusterName, tools: Object.fromEntries(clusterUsage), semanticOverlap },
           });
         }
@@ -407,9 +407,9 @@ export class InterfaceConsistencyDetector implements IDetector {
           issues.push({
             metric: 'inconsistentToolInterface',
             severity: Severity.Warning,
-            message: `${clusterName}组工具在相近代码场景中的使用高度分散 (分散度: ${(effectiveDispersion * 100).toFixed(0)}%)，可能表示接口不够清晰`,
+            message: `Tools in the ${clusterName} group are used in a highly dispersed way across similar code scenarios (dispersion: ${(effectiveDispersion * 100).toFixed(0)}%), which may indicate that the interfaces are not clear enough`,
             location: {},
-            suggestion: `考虑明确各工具的使用场景，或统一相近工具在同一代码任务中的调用方式`,
+            suggestion: `Consider clarifying the usage scenario of each tool, or unifying how similar tools are invoked within the same code task`,
             evidence: {
               type: 'medium',
               details: {

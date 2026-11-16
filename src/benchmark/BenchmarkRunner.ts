@@ -4,7 +4,8 @@ import { EvaluationReport } from '../types/evaluation.types';
 import { cohensD } from './Stats';
 
 /**
- * BenchmarkRunner: 聚合多次试验的评测结果，输出均值与Bootstrap置信区间。
+ * BenchmarkRunner: aggregates evaluation results across multiple trials and reports means with
+ * bootstrap confidence intervals.
  */
 export class BenchmarkRunner {
   private reports: EvaluationReport[] = [];
@@ -19,7 +20,7 @@ export class BenchmarkRunner {
   }
 
   /**
-   * 简单Bootstrap置信区间（均值，95% CI）。
+   * Simple bootstrap confidence interval (mean, 95% CI).
    */
   private bootstrapMeanCI(values: number[], B = 2000, alpha = 0.05): { mean: number; lo: number; hi: number } {
     const n = values.length;
@@ -73,12 +74,12 @@ export class BenchmarkRunner {
   }
 
   /**
-   * 导出简要Markdown报告。
+   * Export a brief Markdown report.
    */
   saveMarkdown(outPath: string): void {
     const lines: string[] = [];
-    lines.push('# Benchmark 汇总');
-    lines.push(`样本数: ${this.reports.length}`);
+    lines.push('# Benchmark Summary');
+    lines.push(`Sample count: ${this.reports.length}`);
     lines.push('');
 
     const dims: Array<keyof EvaluationReport['dimensions']> = [
@@ -88,7 +89,7 @@ export class BenchmarkRunner {
       'workflowArchitecture',
       'toolEcosystemConsistency',
     ];
-    lines.push('| 维度 | 平均告警 | 告警95%CI | 平均错误 | 错误95%CI |');
+    lines.push('| Dimension | Mean Warnings | Warnings 95% CI | Mean Errors | Errors 95% CI |');
     lines.push('|---|---|---|---|---|');
     for (const d of dims) {
       const warnings = this.aggregateDimensionCount(d, 'warnings');
@@ -102,14 +103,14 @@ export class BenchmarkRunner {
 
     if (analyzedSteps || averageChainLength || maxChainLength) {
       lines.push('');
-      lines.push('## 上下文链分析汇总');
-      this.pushMetricLine(lines, '平均分析步数', analyzedSteps);
-      this.pushMetricLine(lines, '平均上下文链长度', averageChainLength);
-      this.pushMetricLine(lines, '平均最大链长度', maxChainLength);
+      lines.push('## Context Chain Analysis Summary');
+      this.pushMetricLine(lines, 'Mean analyzed steps', analyzedSteps);
+      this.pushMetricLine(lines, 'Mean context chain length', averageChainLength);
+      this.pushMetricLine(lines, 'Mean maximum chain length', maxChainLength);
     }
 
     lines.push('');
-    lines.push('## 过程风险与控制保持');
+    lines.push('## Process Risk and Control Preservation');
     this.pushMetricLine(lines, 'overallRisk', this.aggregateContextMetric(report => report.risk?.overallRisk));
     this.pushMetricLine(lines, 'averagePosteriorRisk', this.aggregateContextMetric(report => report.risk?.averagePosteriorRisk));
     this.pushMetricLine(lines, 'expectedCalibrationError', this.aggregateContextMetric(report => report.risk?.calibration.expectedCalibrationError));
@@ -118,7 +119,7 @@ export class BenchmarkRunner {
     this.pushMetricLine(lines, 'autonomyLevel', this.aggregateContextMetric(report => report.executionGuidance?.autonomyLevel));
 
     lines.push('');
-    lines.push('## 任务结果质量');
+    lines.push('## Task Outcome Quality');
     this.pushMetricLine(
       lines,
       'taskCompletionRate',
@@ -136,7 +137,7 @@ export class BenchmarkRunner {
     );
 
     lines.push('');
-    lines.push('## 风险维度摘要');
+    lines.push('## Risk Dimension Summary');
     this.pushMetricLine(
       lines,
       'Context Management avg posterior',
@@ -158,14 +159,14 @@ export class BenchmarkRunner {
       this.aggregateContextMetric(report => report.risk?.dimensions.toolEcosystemConsistency.averagePosteriorRisk)
     );
 
-    // 简单效应量示例：与第一份报告进行比较（若存在另一组）
+    // Simple effect size example: compare against the first report (if another group exists)
     if (this.reports.length >= 2) {
       lines.push('');
-      lines.push('## 效应量（示例，对比前两组）');
+      lines.push('## Effect Size (example, comparing the first two groups)');
       const a = this.reports[0];
       const b = this.reports[1];
       const dims2: Array<keyof EvaluationReport['dimensions']> = dims;
-      lines.push('| 维度 | 告警 Cohen d | 错误 Cohen d |');
+      lines.push('| Dimension | Warnings Cohen d | Errors Cohen d |');
       lines.push('|---|---|---|');
       for (const d of dims2) {
         const warningD = cohensD([a.dimensions[d].warnings], [b.dimensions[d].warnings]);
@@ -179,7 +180,7 @@ export class BenchmarkRunner {
   }
 }
 
-// 可执行入口：从默认输出目录聚合并生成markdown
+// Executable entry point: aggregate from the default output directory and generate markdown
 if (require.main === module) {
   const inputDir = process.argv[2] || path.join(process.cwd(), 'output/evaluation-reports');
   const outPath = process.argv[3] || path.join(process.cwd(), 'output/benchmark/summary.md');

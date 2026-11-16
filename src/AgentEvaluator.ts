@@ -32,7 +32,7 @@ export interface AgentEvaluatorOptions {
 }
 
 /**
- * Agent评估器主类
+ * Main Agent evaluator class
  */
 export class AgentEvaluator {
   private sessionData: SessionData;
@@ -56,7 +56,7 @@ export class AgentEvaluator {
   }
 
   /**
-   * 从JSONL文件创建评估器
+   * Creates an evaluator from a JSONL file
    */
   static async fromJsonlFile(
     filePath: string,
@@ -69,17 +69,17 @@ export class AgentEvaluator {
   }
 
   /**
-   * 执行完整评估
+   * Runs the full evaluation
    */
   async evaluate(): Promise<EvaluationReport> {
-    console.log(`开始评估 Run ID: ${this.runId}`);
+    console.log(`Starting evaluation for Run ID: ${this.runId}`);
     const contextChainSummary = this.contextChains.buildSummary();
     const eventStreamSummary = this.eventStreamConverter.buildSummary();
     console.log(
-      `上下文链分析: ${contextChainSummary.analyzedSteps} 步, 平均链长度 ${contextChainSummary.averageChainLength.toFixed(2)}, 最大链长度 ${contextChainSummary.maxChainLength}`
+      `Context chain analysis: ${contextChainSummary.analyzedSteps} steps, average chain length ${contextChainSummary.averageChainLength.toFixed(2)}, max chain length ${contextChainSummary.maxChainLength}`
     );
     console.log(
-      `标准事件流: ${eventStreamSummary.totalEvents} 事件 (${eventStreamSummary.messageEvents} message / ${eventStreamSummary.toolCallEvents} tool_call / ${eventStreamSummary.toolResultEvents} tool_result)`
+      `Standard event stream: ${eventStreamSummary.totalEvents} events (${eventStreamSummary.messageEvents} message / ${eventStreamSummary.toolCallEvents} tool_call / ${eventStreamSummary.toolResultEvents} tool_result)`
     );
 
     const dimensionResults: {
@@ -90,38 +90,38 @@ export class AgentEvaluator {
       taskOutcome?: EvaluationResult;
     } = {};
 
-    // 工具使用效率评估
-    console.log('评估工具使用效率...');
+    // Tool use efficiency evaluation
+    console.log('Evaluating tool use efficiency...');
     const toolUseEvaluator = new ToolUseEfficiencyEvaluator(this.sessionData, this.config);
     dimensionResults.toolUseEfficiency = await toolUseEvaluator.evaluate();
-    console.log(`  - 告警: ${dimensionResults.toolUseEfficiency.warnings}, 错误: ${dimensionResults.toolUseEfficiency.errors}`);
+    console.log(`  - warnings: ${dimensionResults.toolUseEfficiency.warnings}, errors: ${dimensionResults.toolUseEfficiency.errors}`);
 
-    // 工作流架构评估
-    console.log('评估工作流架构...');
+    // Workflow architecture evaluation
+    console.log('Evaluating workflow architecture...');
     const workflowEvaluator = new WorkflowArchitectureEvaluator(this.sessionData, this.config);
     dimensionResults.workflowArchitecture = await workflowEvaluator.evaluate();
-    console.log(`  - 告警: ${dimensionResults.workflowArchitecture.warnings}, 错误: ${dimensionResults.workflowArchitecture.errors}`);
+    console.log(`  - warnings: ${dimensionResults.workflowArchitecture.warnings}, errors: ${dimensionResults.workflowArchitecture.errors}`);
 
-    // 上下文管理评估
-    console.log('评估上下文管理...');
+    // Context management evaluation
+    console.log('Evaluating context management...');
     const contextManagementEvaluator = new ContextManagementEvaluator(this.sessionData, this.config);
     dimensionResults.contextManagement = await contextManagementEvaluator.evaluate();
-    console.log(`  - 告警: ${dimensionResults.contextManagement.warnings}, 错误: ${dimensionResults.contextManagement.errors}`);
+    console.log(`  - warnings: ${dimensionResults.contextManagement.warnings}, errors: ${dimensionResults.contextManagement.errors}`);
 
-    // 工具生态一致性评估
-    console.log('评估工具生态一致性...');
+    // Tool ecosystem consistency evaluation
+    console.log('Evaluating tool ecosystem consistency...');
     const toolEcosystemEvaluator = new ToolEcosystemEvaluator(this.sessionData, this.config);
     dimensionResults.toolEcosystemConsistency = await toolEcosystemEvaluator.evaluate();
-    console.log(`  - 告警: ${dimensionResults.toolEcosystemConsistency.warnings}, 错误: ${dimensionResults.toolEcosystemConsistency.errors}`);
+    console.log(`  - warnings: ${dimensionResults.toolEcosystemConsistency.warnings}, errors: ${dimensionResults.toolEcosystemConsistency.errors}`);
 
-    // 任务结果评估
-    console.log('评估任务结果...');
+    // Task outcome evaluation
+    console.log('Evaluating task outcome...');
     const taskOutcomeEvaluator = new TaskOutcomeEvaluator(this.sessionData, this.config);
     dimensionResults.taskOutcome = await taskOutcomeEvaluator.evaluate();
-    console.log(`  - 完成率: ${(dimensionResults.taskOutcome.details.taskCompletionRate * 100).toFixed(0)}%, 可执行性: ${(dimensionResults.taskOutcome.details.outputExecutability * 100).toFixed(0)}%, 验证率: ${(dimensionResults.taskOutcome.details.postModificationVerificationRate * 100).toFixed(0)}%`);
+    console.log(`  - completion rate: ${(dimensionResults.taskOutcome.details.taskCompletionRate * 100).toFixed(0)}%, executability: ${(dimensionResults.taskOutcome.details.outputExecutability * 100).toFixed(0)}%, verification rate: ${(dimensionResults.taskOutcome.details.postModificationVerificationRate * 100).toFixed(0)}%`);
 
-    // 计算最终报告
-    console.log('生成评估报告...');
+    // Compute the final report
+    console.log('Generating evaluation report...');
     const calculator = new ScoreCalculator(this.config);
     const report = calculator.calculateReport(
       this.runId,
@@ -131,7 +131,7 @@ export class AgentEvaluator {
       eventStreamSummary
     );
 
-    if (this.options.paperControlPreservation) {
+if (this.options.paperControlPreservation) {
       const risks = extractDefectPosteriorRisks(report.findings || []);
       const paperControl = computePaperControlPreservation(this.sessionData, risks);
       report.controlPreservation = {
@@ -139,7 +139,7 @@ export class AgentEvaluator {
         level: paperControl.level,
         metrics: paperControl.metrics,
         evidence: [
-          `论文 Appendix A.5 CP: toolCalls=${paperControl.features.toolCalls}, ` +
+          `Paper Appendix A.5 CP: toolCalls=${paperControl.features.toolCalls}, ` +
             `anchored=${paperControl.features.anchoredToolCalls}, ` +
             `recovered=${paperControl.features.recoveredFailures}/${paperControl.features.failedToolCalls}, ` +
             `checkpointed=${paperControl.features.checkpointedMutations}/${paperControl.features.mutatingOperations}, ` +
@@ -151,14 +151,14 @@ export class AgentEvaluator {
       report.controlPreservationFeatures = paperControl.features as unknown as Record<string, number>;
     }
 
-    console.log('评估完成! 已生成非评分制诊断报告');
-    console.log(`总告警: ${report.summary.totalWarnings}, 总错误: ${report.summary.totalErrors}`);
+    console.log('Evaluation complete! A non-scoring diagnostic report has been generated');
+    console.log(`Total warnings: ${report.summary.totalWarnings}, total errors: ${report.summary.totalErrors}`);
 
     return report;
   }
 
   /**
-   * 评估并保存报告
+   * Runs the evaluation and saves the report
    */
   async evaluateAndSave(
     outputDir: string,
@@ -170,26 +170,26 @@ export class AgentEvaluator {
     const generator = new ReportGenerator();
     await generator.saveReport(report, outputDir, formats);
 
-    console.log(`报告已保存到: ${outputDir}`);
+    console.log(`Report saved to: ${outputDir}`);
 
     return report;
   }
 
   /**
-   * 提取Run ID
+   * Extracts the Run ID
    */
   private extractRunId(): string {
-    // 从第一条消息或其他地方提取run ID
+    // Extract the run ID from the first message or elsewhere
     const firstMessage = Array.from(this.sessionData.messages.values())[0];
     if (firstMessage) {
-      // 简化处理: 使用第一条消息的UUID前8位
+      // Simplified handling: use the first 8 characters of the first message UUID
       return firstMessage.uuid.substring(0, 8);
     }
     return 'unknown';
   }
 
   /**
-   * 获取Session统计信息
+   * Returns session statistics
    */
   getSessionStats(): any {
     return {
@@ -251,14 +251,14 @@ export class AgentEvaluator {
       assistantMessages++;
       const content = this.extractMessageText(message.content).toLowerCase();
       if (
-        ['checkpoint', 'summary', 'progress', 'next step', 'plan', '阶段', '检查点', '总结', '进度'].some(
+        ['checkpoint', 'summary', 'progress', 'next step', 'plan'].some(
           keyword => content.includes(keyword)
         )
       ) {
         checkpointSignals++;
       }
       if (
-        ['handoff', 'need user', 'confirm', 'review', '人工', '确认', '接管', '选择', '决定'].some(
+        ['handoff', 'need user', 'confirm', 'review'].some(
           keyword => content.includes(keyword)
         )
       ) {

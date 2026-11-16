@@ -9,10 +9,11 @@ export interface PrewarnItem {
 }
 
 /**
- * 写入预警信息到 output/prewarn.json，便于运行时系统或后续流程消费。
+ * Writes prewarn information to output/prewarn.json so that runtime systems or
+ * downstream stages can consume it.
  */
 export function writePrewarn(item: Omit<PrewarnItem, 'timestamp'>) {
-  // 通过环境变量控制开关，默认开启：PREWARN_ENABLED=1
+  // Toggled by an environment variable, enabled by default: PREWARN_ENABLED=1
   if (process.env.PREWARN_ENABLED === '0' || process.env.PREWARN_ENABLED === 'false') {
     return;
   }
@@ -30,6 +31,6 @@ export function writePrewarn(item: Omit<PrewarnItem, 'timestamp'>) {
       fs.writeFileSync(outPath, JSON.stringify(arr, null, 2), 'utf-8');
     }
   } catch (e) {
-    // 忽略写入错误，评测不应因此失败
+    // Ignore write errors; evaluation should not fail because of them
   }
 }

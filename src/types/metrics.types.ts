@@ -1,9 +1,9 @@
 /**
- * 指标相关类型定义
+ * Metric-related type definitions
  */
 
 /**
- * 工具调用链信息
+ * Tool call chain information
  */
 export interface ToolChainInfo {
   toolName: string;
@@ -14,7 +14,7 @@ export interface ToolChainInfo {
 }
 
 /**
- * 循环调用信息
+ * Cyclic call information
  */
 export interface CyclicChainInfo {
   pattern: string[];
@@ -24,7 +24,7 @@ export interface CyclicChainInfo {
 }
 
 /**
- * Ghost Context信息
+ * Ghost Context information
  */
 export interface GhostContextInfo {
   type: 'summary_duplication' | 'unusable_payload' | 'unreferenced_history';
@@ -35,7 +35,7 @@ export interface GhostContextInfo {
 }
 
 /**
- * 上下文抖动信息
+ * Context thrashing information
  */
 export interface ThrashingInfo {
   type: 'timing_fault' | 'payload_oversize_fault';
@@ -48,7 +48,7 @@ export interface ThrashingInfo {
 }
 
 /**
- * Dead Step信息
+ * Dead Step information
  */
 export interface DeadStepInfo {
   stepId: number;
@@ -63,7 +63,7 @@ export interface DeadStepInfo {
 }
 
 /**
- * 重复步骤信息
+ * Duplicate step information
  */
 export interface DuplicateStepInfo {
   type: 'exact' | 'near' | 'context_loss';
@@ -76,7 +76,7 @@ export interface DuplicateStepInfo {
 }
 
 /**
- * Wrapper Workflow信息
+ * Wrapper Workflow information
  */
 export interface WrapperWorkflowInfo {
   agentId: string;
@@ -89,7 +89,7 @@ export interface WrapperWorkflowInfo {
 }
 
 /**
- * 上下文耦合信息
+ * Context coupling information
  */
 export interface ContextCouplingInfo {
   type: 'scc' | 'back_edge' | 'alternating_pattern';
@@ -99,7 +99,7 @@ export interface ContextCouplingInfo {
 }
 
 /**
- * 长链信息
+ * Long chain information
  */
 export interface LongChainInfo {
   totalSteps: number;
@@ -109,7 +109,7 @@ export interface LongChainInfo {
 }
 
 /**
- * 工具接口不一致信息
+ * Inconsistent tool interface information
  */
 export interface InconsistentToolInfo {
   cluster: string[];
@@ -121,7 +121,7 @@ export interface InconsistentToolInfo {
 }
 
 /**
- * 弱工具信息
+ * Weak tool information
  */
 export interface WeakToolInfo {
   toolName: string;
@@ -135,7 +135,7 @@ export interface WeakToolInfo {
 }
 
 /**
- * 相似度计算结果
+ * Similarity computation result
  */
 export interface SimilarityResult {
   similarity: number;

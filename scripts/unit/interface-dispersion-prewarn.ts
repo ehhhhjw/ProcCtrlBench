@@ -35,7 +35,7 @@ async function main() {
   if (fs.existsSync(prewarn)) fs.unlinkSync(prewarn);
 
   const s = emptySession();
-  // 构造 file_read 组的调用：Read 9，Grep 6，Glob 1 → 分散度约高，接近预警阈值
+  // Build calls in the file_read group: Read 9, Grep 6, Glob 1 -> dispersion runs high, near the prewarn threshold
   let ts = 0;
   const add = (name:string)=>{
     const id = `TU_${name}_${ts}`;
@@ -50,16 +50,16 @@ async function main() {
   await det.detect();
 
   if (!fs.existsSync(prewarn)) {
-    console.error('期望产生接口分散度接近阈值的预警，但未找到 prewarn.json');
+    console.error('Expected an interface-dispersion near-threshold prewarn, but prewarn.json was not found');
     process.exit(1);
   }
   const arr = JSON.parse(fs.readFileSync(prewarn,'utf-8'));
-  const hit = arr.some((x:any)=> x.metric==='inconsistentToolInterface' && String(x.message||'').includes('分散度接近阈值'));
+  const hit = arr.some((x:any)=> x.metric==='inconsistentToolInterface' && String(x.message||'').includes('dispersion near threshold'));
   if (!hit) {
-    console.error('未发现接口分散度的接近阈值预警');
+    console.error('No near-threshold prewarn found for interface dispersion');
     process.exit(1);
   }
-  console.log('[ok] interface-dispersion-prewarn: 接近阈值预警生效');
+  console.log('[ok] interface-dispersion-prewarn: near-threshold prewarn fired');
 }
 
 main().catch(e=>{ console.error(e); process.exit(1); });

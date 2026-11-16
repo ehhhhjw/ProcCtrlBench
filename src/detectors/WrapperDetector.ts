@@ -8,8 +8,8 @@ import { writePrewarn } from '../utils/Prewarn';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 包装工作流检测器
- * 检测仅透传输入给下游工具，无附加价值的工作流
+ * Wrapper workflow detector
+ * Detects workflows that merely pass input through to downstream tools without adding value
  */
 export class WrapperDetector implements IDetector {
   readonly name = 'WrapperDetector';
@@ -35,10 +35,10 @@ export class WrapperDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 识别所有Agent调用
+    // Identify all Agent invocations
     const agentCalls = this.identifyAgentCalls();
 
-    // 按照agentId分组，统计每个Agent的调用次数和包装行为
+    // Group by agentId and count each Agent's invocations and wrapper behavior
     const agentCallGroups = new Map<string, Array<{
       agentId: string;
       initiatorUuid: string;
@@ -46,7 +46,7 @@ export class WrapperDetector implements IDetector {
     }>>();
 
     for (const agentCall of agentCalls) {
-      // 使用agentName作为分组key(如果有)，否则使用agentId
+      // Use agentName as the grouping key (if available), otherwise use agentId
       const agent = this.sessionData.agents.get(agentCall.agentId);
       const groupKey = agent?.name || agentCall.agentId;
 
@@ -56,14 +56,14 @@ export class WrapperDetector implements IDetector {
       agentCallGroups.get(groupKey)!.push(agentCall);
     }
 
-    // 对每个Agent组进行分析
+    // Analyze each Agent group
     for (const [groupKey, calls] of agentCallGroups) {
-      // 关键修复: 只对调用次数≥5次的Agent进行判定
+      // Key fix: only make a judgement for Agents invoked at least 5 times
       if (calls.length < 5) {
-        continue; // 跳过调用次数不足的Agent
+        continue; // Skip Agents with too few invocations
       }
 
-      // 分析每次调用，统计包装行为
+      // Analyze each invocation and count wrapper behavior
       let wrapperCount = 0;
       const analyses: Array<WrapperWorkflowInfo & { isWrapper: boolean }> = [];
 
@@ -75,34 +75,34 @@ export class WrapperDetector implements IDetector {
         }
       }
 
-      // 计算包装率 (多次调用中有多少比例是wrapper行为)
+      // Calculate the wrapper rate (what proportion of the invocations show wrapper behavior)
       const wrapperRate = wrapperCount / calls.length;
 
-      // 临近阈值的预警（不触发问题，仅提示）
+      // Prewarn when near threshold (does not raise an issue, informational only)
       if (wrapperRate >= 0.75 && wrapperRate < 0.80) {
         writePrewarn({
           metric: 'wrapperWorkflow',
-          message: `Agent包装率接近阈值: ${(wrapperRate * 100).toFixed(0)}%`,
+          message: `Agent wrapper rate near threshold: ${(wrapperRate * 100).toFixed(0)}%`,
           details: { group: groupKey, totalCalls: calls.length },
         });
       }
 
-      // 判定: ≥80% warning, ≥95% error
+      // Judgement: ≥80% warning, ≥95% error
       if (wrapperRate >= 0.80) {
         const severity = wrapperRate >= 0.95 ? Severity.Error : Severity.Warning;
         const deduction = severity === Severity.Error ? 2.0 : 1.0;
 
-        // 使用第一次调用的信息作为代表
+        // Use the information from the first invocation as representative
         const firstAnalysis = analyses[0];
 
         issues.push({
           metric: 'wrapperWorkflow',
           severity,
-          message: `检测到冗余包装工作流: Agent "${firstAnalysis.agentName || groupKey}" 在${calls.length}次调用中有${wrapperCount}次(${(wrapperRate * 100).toFixed(0)}%)仅透传输入`,
+          message: `Redundant wrapper workflow detected: Agent "${firstAnalysis.agentName || groupKey}" in ${calls.length} invocations merely passed input through ${wrapperCount} times (${(wrapperRate * 100).toFixed(0)}%)`,
           location: {
             messageUuid: calls[0].initiatorUuid,
           },
-          suggestion: `该Agent没有提供附加价值，考虑直接调用下游工具，或为Agent添加验证、转换等逻辑`,
+          suggestion: `This Agent provides no added value. Consider invoking the downstream tool directly, or adding validation, transformation, or similar logic to the Agent`,
           evidence: {
             type: severity === Severity.Error ? 'strong' : 'medium',
             details: {
@@ -124,7 +124,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 识别Agent调用
+   * Identifies Agent invocations
    */
   private identifyAgentCalls(): Array<{
     agentId: string;
@@ -137,18 +137,18 @@ export class WrapperDetector implements IDetector {
       toolUse: ToolUseInfo;
     }> = [];
 
-    // 方法1: 通过Agent工具调用识别
+    // Method 1: identify via Agent tool invocations
     for (const toolUse of this.sessionData.toolUses.values()) {
       if (toolUse.name === 'Agent') {
         agentCalls.push({
-          agentId: toolUse.id, // 使用tool use id作为标识
+          agentId: toolUse.id, // Use the tool use id as the identifier
           initiatorUuid: toolUse.messageUuid,
           toolUse,
         });
       }
     }
 
-    // 方法2: 通过agentId和isSidechain识别
+    // Method 2: identify via agentId and isSidechain
     for (const agent of this.sessionData.agents.values()) {
       if (agent.messageUuids.length > 0) {
         const firstMessage = this.sessionData.messages.get(agent.messageUuids[0]);
@@ -175,7 +175,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 分析Agent调用
+   * Analyzes an Agent invocation
    */
   private analyzeAgentCall(agentCall: {
     agentId: string;
@@ -185,11 +185,11 @@ export class WrapperDetector implements IDetector {
     const agent = this.sessionData.agents.get(agentCall.agentId);
     const agentName = agent?.name;
 
-    // 获取Agent内部的步骤
+    // Get the Agent's internal steps
     const internalSteps = this.getInternalSteps(agentCall.agentId);
     const downstreamTools = this.getDownstreamTools(internalSteps);
 
-    // 判定条件
+    // Judgement conditions
     const codeScope = this.analyzeCodeScope(downstreamTools);
     const checks = {
       fewSteps: internalSteps.length <= 1,
@@ -200,7 +200,7 @@ export class WrapperDetector implements IDetector {
       narrowCodeScope: codeScope.isNarrow,
     };
 
-    // 额外：符号新增占比很低也视为包装迹象
+    // Additionally: a very low proportion of newly added symbols is also treated as a wrapper signal
     const symbolDeltaLow = this.hasLowSymbolDelta(agentCall, downstreamTools);
     const passedChecks = [
       checks.fewSteps,
@@ -213,7 +213,7 @@ export class WrapperDetector implements IDetector {
     ].filter(v => v).length;
     const wrapperRate = passedChecks / 7;
 
-    const isWrapper = wrapperRate >= 0.8; // 80%以上的条件满足
+    const isWrapper = wrapperRate >= 0.8; // At least 80% of the conditions are satisfied
 
     return {
       agentId: agentCall.agentId,
@@ -228,7 +228,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 获取Agent内部步骤
+   * Gets the Agent's internal steps
    */
   private getInternalSteps(agentId: string): MessageNode[] {
     const steps: MessageNode[] = [];
@@ -243,14 +243,14 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 获取下游工具调用
+   * Gets downstream tool invocations
    */
   private getDownstreamTools(steps: MessageNode[]): ToolUseInfo[] {
     const tools: ToolUseInfo[] = [];
 
     for (const step of steps) {
       for (const toolUse of step.toolUses) {
-        // 排除元工具
+        // Exclude meta tools
         if (toolUse.name !== 'Agent' && toolUse.name !== 'AskUserQuestion') {
           tools.push(toolUse);
         }
@@ -261,7 +261,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 检查是否只有单一工具类型
+   * Checks whether there is only a single tool type
    */
   private hasSingleToolType(tools: ToolUseInfo[]): boolean {
     if (tools.length === 0) return true;
@@ -271,12 +271,12 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 计算输入相似度
+   * Calculates input similarity
    */
   private calculateInputSimilarity(agentInput: any, downstreamTools: ToolUseInfo[]): boolean {
     if (downstreamTools.length === 0) return false;
 
-    // 比较Agent输入和第一个下游工具的输入
+    // Compare the Agent input with the input of the first downstream tool
     const firstTool = downstreamTools[0];
     const similarity = ContentSimilarityAnalyzer.calculateStructuralSimilarity(
       agentInput,
@@ -287,7 +287,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 计算输出相似度
+   * Calculates output similarity
    */
   private calculateOutputSimilarity(
     agentCall: { agentId: string; toolUse: ToolUseInfo },
@@ -295,16 +295,16 @@ export class WrapperDetector implements IDetector {
   ): boolean {
     if (downstreamTools.length === 0) return false;
 
-    // 获取Agent的输出
+    // Get the Agent's output
     const agentResult = this.sessionData.toolResults.get(agentCall.toolUse.id);
     if (!agentResult) return false;
 
-    // 获取最后一个下游工具的输出
+    // Get the output of the last downstream tool
     const lastTool = downstreamTools[downstreamTools.length - 1];
     const lastToolResult = this.sessionData.toolResults.get(lastTool.id);
     if (!lastToolResult) return false;
 
-    // 比较内容
+    // Compare the contents
     const agentContent = this.extractContent(agentResult.content);
     const toolContent = this.extractContent(lastToolResult.content);
 
@@ -314,7 +314,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * Agent输出与下��最终输出在符号层面的新增占比是否很低。
+   * Whether the proportion of newly added symbols in the Agent output relative to the final downstream output is very low.
    */
   private hasLowSymbolDelta(
     agentCall: { agentId: string; toolUse: ToolUseInfo },
@@ -343,7 +343,7 @@ export class WrapperDetector implements IDetector {
       ...(bs.properties || []),
       ...(bs.variables || []),
     ]);
-    if (aset.size === 0) return true; // 无新增符号
+    if (aset.size === 0) return true; // No newly added symbols
     let newSym = 0;
     for (const s of aset) if (!bset.has(s)) newSym++;
     const addedRatio = newSym / aset.size;
@@ -351,17 +351,17 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 检查是否有验证逻辑
+   * Checks whether validation logic is present
    */
   private hasValidation(steps: MessageNode[]): boolean {
-    // 检查是否有验证相关的工具调用
+    // Check for validation-related tool invocations
     const validationTools = ['Bash', 'Agent'];
     let validationCount = 0;
 
     for (const step of steps) {
       for (const toolUse of step.toolUses) {
         if (validationTools.includes(toolUse.name)) {
-          // 检查是否是测试/验证命令
+          // Check whether it is a test/validation command
           if (toolUse.name === 'Bash') {
             const command = toolUse.input.command || '';
             if (command.includes('test') || command.includes('check') || command.includes('verify')) {
@@ -371,10 +371,10 @@ export class WrapperDetector implements IDetector {
         }
       }
 
-      // 检查assistant消息是否包含验证逻辑
+      // Check whether the assistant message contains validation logic
       if (step.type === 'assistant') {
         const content = this.extractContent(step.content);
-        if (content.includes('验证') || content.includes('检查') || content.includes('确认')) {
+        if (content.includes('verify') || content.includes('check') || content.includes('confirm')) {
           validationCount++;
         }
       }
@@ -450,7 +450,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 获取最常见的工具类型
+   * Gets the most common tool type
    */
   private getMostCommonToolType(tools: ToolUseInfo[]): string {
     if (tools.length === 0) return 'unknown';
@@ -475,7 +475,7 @@ export class WrapperDetector implements IDetector {
   }
 
   /**
-   * 提取内容
+   * Extracts content
    */
   private extractContent(content: any): string {
     if (typeof content === 'string') {

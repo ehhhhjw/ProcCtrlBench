@@ -169,7 +169,7 @@ async function main() {
 
     const withAst = await new LongChainDetector(createSession(), DEFAULT_EVALUATION_CONFIG).detect();
     if (withAst.some((issue) => issue.metric === 'longChain')) {
-      console.error('期望 AST 结构化子任务/检查点降低 LongChain 告警，但仍然命中');
+      console.error('Expected AST structural subtasks/checkpoints to suppress the LongChain warning, but it still fired');
       process.exit(1);
     }
 
@@ -187,11 +187,11 @@ async function main() {
     if (!withoutAst.some((issue) => issue.metric === 'longChain')) {
       console.error(JSON.stringify(debugInfo, null, 2));
       console.error(JSON.stringify(withoutAst, null, 2));
-      console.error('缺少项目 AST 时，期望命中 LongChain 告警，但未命中');
+      console.error('Without the project AST, the LongChain warning was expected to fire, but it did not');
       process.exit(1);
     }
 
-    console.log('[ok] longchain-structural-subtasks: 项目 AST 可识别隐式子任务与检查点');
+    console.log('[ok] longchain-structural-subtasks: the project AST can identify implicit subtasks and checkpoints');
   } finally {
     restoreFile(projectAstPath, backupPath);
   }

@@ -1,9 +1,9 @@
 /**
- * 评估系统的核心类型定义
+ * Core type definitions for the evaluation system
  */
 
 /**
- * 告警等级
+ * Warning severity levels
  */
 export enum Severity {
   Info = 'info',
@@ -106,7 +106,7 @@ export interface DetectorCalibrationProfile {
 }
 
 /**
- * 检测到的问题
+ * A detected issue
  */
 export interface DetectionIssue {
   metric: string;
@@ -125,7 +125,7 @@ export interface DetectionIssue {
   normalizedSignal?: number;
   detectorScore?: number;
   exemptionsApplied?: string[];
-  deduction: number; // 内部严重性权重，不再用于对外评分
+  deduction: number; // Internal severity weight, no longer used for external scoring
 }
 
 export interface ProcessFinding {
@@ -219,27 +219,27 @@ export interface ExecutionContextSummary {
 }
 
 /**
- * 评估器接口
+ * Evaluator interface
  */
 export interface IEvaluator {
   /**
-   * 评估器名称
+   * Evaluator name
    */
   readonly name: string;
 
   /**
-   * 评估器描述
+   * Evaluator description
    */
   readonly description: string;
 
   /**
-   * 执行评估
+   * Runs the evaluation
    */
   evaluate(): Promise<EvaluationResult>;
 }
 
 /**
- * 评估结果
+ * Evaluation result
  */
 export interface EvaluationResult {
   dimension: string;
@@ -287,27 +287,27 @@ export interface EventStreamAnalysisSummary {
 }
 
 /**
- * 检测器接口
+ * Detector interface
  */
 export interface IDetector {
   /**
-   * 检测器名称
+   * Detector name
    */
   readonly name: string;
 
   /**
-   * 执行检测
+   * Runs the detection
    */
   detect(): Promise<DetectionIssue[]>;
 }
 
 /**
- * 对外报告中的问题
+ * An issue as exposed in the external report
  */
 export interface ReportedIssue extends Omit<DetectionIssue, 'deduction'> {}
 
 /**
- * 指标摘要
+ * Metric summary
  */
 export interface MetricSummary {
   warnings: number;
@@ -315,7 +315,7 @@ export interface MetricSummary {
 }
 
 /**
- * 维度摘要
+ * Dimension summary
  */
 export interface DimensionSummary {
   warnings: number;
@@ -324,7 +324,7 @@ export interface DimensionSummary {
 }
 
 /**
- * 完整的评估报告
+ * The complete evaluation report
  */
 export interface EvaluationReport {
   runId: string;
@@ -389,7 +389,7 @@ export interface EvaluationReport {
 }
 
 /**
- * 标准化的事件流
+ * The normalized event stream
  */
 export interface EvaluationEvent {
   run_id: string;
@@ -414,7 +414,7 @@ export interface EvaluationEvent {
 }
 
 /**
- * 评估配置
+ * Evaluation configuration
  */
 /** 论文层次贝叶斯校准参数在评测阶段的最小结构 */
 export interface PaperCalibrationParameter {
@@ -432,7 +432,7 @@ export interface PaperCalibrationConfig {
 }
 
 export interface EvaluationConfig {
-  // 阈值配置
+  // Threshold configuration
   thresholds: {
     ghostContext: {
       warningTokens: number;
@@ -461,7 +461,7 @@ export interface EvaluationConfig {
       simpleErrorLength: number;
     };
   };
-  // 上下文窗口大小
+  // Context window size
   contextWindowSize: number;
   riskModel: {
     warningThreshold: number;

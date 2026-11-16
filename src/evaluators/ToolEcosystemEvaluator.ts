@@ -5,29 +5,29 @@ import { InterfaceConsistencyDetector } from '../detectors/InterfaceConsistencyD
 import { WeakToolDetector } from '../detectors/WeakToolDetector';
 
 /**
- * 工具生态一致性评估器
+ * Tool ecosystem consistency evaluator
  */
 export class ToolEcosystemEvaluator extends BaseEvaluator {
   readonly name = 'ToolEcosystemEvaluator';
-  readonly description = '评估工具生态一致性，包括接口一致性和工具可发现性';
+  readonly description = 'Evaluates tool ecosystem consistency, covering interface consistency and tool discoverability';
 
   async evaluate(): Promise<EvaluationResult> {
     const allIssues: DetectionIssue[] = [];
 
-    // 运行Interface Consistency检测器
+    // Run the Interface Consistency detector
     const interfaceConsistencyDetector = new InterfaceConsistencyDetector(this.sessionData, this.config);
     const interfaceIssues = await interfaceConsistencyDetector.detect();
     allIssues.push(...interfaceIssues);
 
-    // 运行Weak Tool检测器
+    // Run the Weak Tool detector
     const weakToolDetector = new WeakToolDetector(this.sessionData, this.config);
     const weakToolIssues = await weakToolDetector.detect();
     allIssues.push(...weakToolIssues);
 
-    // 统计问题
+    // Count issues
     const issueStats = this.calculateIssueStats(allIssues);
 
-    // 构建详细信息
+    // Build the details payload
     const details = this.buildDetails(allIssues);
 
     return {
@@ -40,7 +40,7 @@ export class ToolEcosystemEvaluator extends BaseEvaluator {
   }
 
   /**
-   * 构建详细信息
+   * Builds the details payload
    */
   private buildDetails(issues: DetectionIssue[]): Record<string, any> {
     const interfaceIssues = issues.filter(i => i.metric === 'inconsistentToolInterface');

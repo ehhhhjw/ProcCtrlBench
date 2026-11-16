@@ -38,17 +38,17 @@ export class RemediationEngine {
   private promptForGuidanceAction(actionType: string): string {
     switch (actionType) {
       case 'summarize-context':
-        return '先压缩并总结当前上下文，只保留和下一步直接相关的事实，再继续工具调用。';
+        return 'First compress and summarize the current context, keeping only the facts directly relevant to the next step, then continue with tool calls.';
       case 'create-checkpoint':
-        return '先建立 checkpoint：已完成、未完成、下一步唯一目标。没有 checkpoint 不要继续扩展链路。';
+        return 'Establish a checkpoint first: what is done, what is not, and the single goal of the next step. Do not keep extending the chain without a checkpoint.';
       case 'verify-before-next-step':
-        return '下一步前先验证当前结果是否真的改变了状态，避免重复调用或空转。';
+        return 'Before the next step, verify whether the current result actually changed state, to avoid duplicate calls or spinning in place.';
       case 'request-confirmation':
-        return '当前风险高且控制保持不足。先暴露关键分支和风险，再请求上层确认。';
+        return 'Risk is high and control preservation is insufficient. Surface the key branches and risks first, then request confirmation from a supervisor.';
       case 'handoff':
-        return '当前自治推进已接近失控边界。请立即收敛并切换到人工接管或更强监督模式。';
+        return 'Autonomous progress is approaching the edge of control. Converge immediately and switch to human takeover or a stronger supervision mode.';
       default:
-        return '根据当前风险状态先收敛上下文，再继续执行。';
+        return 'Converge the context according to the current risk state before continuing execution.';
     }
   }
 }

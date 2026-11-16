@@ -1,17 +1,17 @@
-# 基准评测方案
+# Benchmark Evaluation Scheme
 
-本方案对应当前实现：非评分制、可复验、以 issue 为中心。
+This scheme corresponds to the current implementation: non-scored, reproducible, and issue-centric.
 
-## 1. 基本原则
+## 1. Basic Principles
 
-- 评测仅依赖可重放轨迹与项目分析结果。
-- 不依赖人工主观打分。
-- 每个 benchmark 的输出是 issue，而不是分数。
-- `taskOutcome` 输出质量摘要，不参与对外总分。
+- Evaluation depends solely on replayable trajectories and project analysis results.
+- It does not depend on subjective human scoring.
+- The output of each benchmark is an issue, not a score.
+- `taskOutcome` reports a quality summary and does not contribute to any externally facing total score.
 
-## 2. 数据来源
+## 2. Data Sources
 
-- JSONL 轨迹
+- JSONL trajectories
   - `messages`
   - `toolUses`
   - `toolResults`
@@ -19,29 +19,29 @@
   - token usage
 - AST
   - [src/analyzers/AstAnalyzer.ts](./src/analyzers/AstAnalyzer.ts)
-- 项目关系
+- Project relationships
   - [output/project-ast.json](./output/project-ast.json)
-- 外部 related files 数据
+- External related-files data
   - [output/file-graph.json](./output/file-graph.json)
 
-## 3. issue 模型
+## 3. The issue Model
 
-每个 issue 包含：
+Every issue contains:
 
-- 指标名
-- 严重度
-- 位置
-- 证据
-- 建议
+- metric name
+- severity
+- location
+- evidence
+- suggestion
 
-严重度分为：
+Severity is divided into:
 
 - `warning`
 - `error`
 
-内部可以保留严重性权重用于排序，但不再输出总分、等级或维度分数。
+Severity weights may be retained internally for ranking purposes, but total scores, grades, and dimension scores are no longer reported.
 
-## 4. 11 个基准
+## 4. The 11 Benchmarks
 
 - Ghost Context
 - Oversized Rules
@@ -55,48 +55,48 @@
 - Interface Inconsistency
 - Weak Tool
 
-详细定义见：
+For detailed definitions, see:
 
 - [docs/benchmark_specs.md](./docs/benchmark_specs.md)
 - [docs/benchmark_evaluation_guide.md](./docs/benchmark_evaluation_guide.md)
 
 ## 5. `taskOutcome`
 
-[src/evaluators/TaskOutcomeEvaluator.ts](./src/evaluators/TaskOutcomeEvaluator.ts) 输出：
+[src/evaluators/TaskOutcomeEvaluator.ts](./src/evaluators/TaskOutcomeEvaluator.ts) reports:
 
 - `taskCompletionRate`
 - `outputExecutability`
 - `postModificationVerificationRate`
 
-它们是质量描述指标，不对外折算成总分。
+These are quality-descriptive metrics and are not converted into an externally facing total score.
 
-## 6. 统计聚合
+## 6. Statistical Aggregation
 
-[src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts) 当前做的是：
+[src/benchmark/BenchmarkRunner.ts](./src/benchmark/BenchmarkRunner.ts) currently performs:
 
-- 维度平均告警数
-- 维度平均错误数
+- average number of warnings per dimension
+- average number of errors per dimension
 - Bootstrap 95% CI
-- 前两份报告的示例性 Cohen's d
+- an illustrative Cohen's d over the first two reports
 
-因此当前“统计显著性”是围绕 issue count 展开，而不是围绕分数展开。
+Accordingly, "statistical significance" in the current setting is framed around issue counts rather than around scores.
 
-## 7. 当前实现差异说明
+## 7. Notes on Differences in the Current Implementation
 
-相较旧版评分制文档，当前实现已经移除：
+Compared with the older scored-evaluation documentation, the current implementation has removed:
 
 - `totalScore`
 - `overallAssessment`
-- 各维度 `score`
-- 权重与扣分上限的对外语义
+- the per-dimension `score`
+- the externally facing semantics of weights and deduction caps
 
-保留但仅用于内部排序的内容：
+Retained, but used only for internal ranking:
 
 - `deduction`
 
-## 8. 复验建议
+## 8. Reproduction Recommendations
 
-- 先执行项目分析，再评估 session。
-- 对关键 detector 准备正例和反例。
-- 检查 `Write` 不会命中 `deadStep`。
-- 检查 benchmark 汇总输出的是 warning/error 统计，而不是均分。
+- Run the project analysis first, then evaluate the session.
+- Prepare positive and negative examples for the key detectors.
+- Verify that `Write` does not hit `deadStep`.
+- Verify that the benchmark summary reports warning/error statistics rather than average scores.

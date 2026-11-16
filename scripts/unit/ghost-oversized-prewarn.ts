@@ -33,13 +33,13 @@ async function main() {
   fs.mkdirSync(out, { recursive: true });
   if (fs.existsSync(prewarn)) fs.unlinkSync(prewarn);
 
-  // Oversized 近阈值内容：长度×4 使 estimateTokenSize≈warningTokens*0.9
+  // Oversized near-threshold content: length x 4 makes estimateTokenSize approximately warningTokens*0.9
   const nearContent = 'x'.repeat(Math.floor(DEFAULT_EVALUATION_CONFIG.thresholds.oversizedRules.warningTokens * 0.95 * 4));
   const s1 = sessionWithSystem(nearContent);
   const o = new OversizedRulesDetector(s1, DEFAULT_EVALUATION_CONFIG);
   await o.detect();
 
-  // Ghost 近阈值：使用不可消费payload（近似base64长串），估算token接近阈值
+  // Ghost near threshold: use a non-consumable payload (a long base64-like string) so the estimated tokens land near the threshold
   const s2 = sessionWithSystem('');
   const nearGhost = 'A'.repeat(Math.floor(DEFAULT_EVALUATION_CONFIG.thresholds.ghostContext.warningTokens * 0.95 * 4));
   const tr: ToolResultInfo = { tool_use_id: 'ghostTU', content: nearGhost, is_error: false, timestamp: 2, messageId: 'ghostTU', messageUuid: 'ghostTU' } as any;
@@ -48,17 +48,17 @@ async function main() {
   await g.detect();
 
   if (!fs.existsSync(prewarn)) {
-    console.error('预期应产生 Oversized/Ghost 的接近阈值预警，但未找到');
+    console.error('Expected near-threshold prewarns for Oversized/Ghost, but none were found');
     process.exit(1);
   }
   const arr = JSON.parse(fs.readFileSync(prewarn,'utf-8'));
-  const hitOversized = arr.some((x:any)=> x.metric==='oversizedRules' && String(x.message||'').includes('接近阈值'));
-  const hitGhost = arr.some((x:any)=> x.metric==='ghostContext' && String(x.message||'').includes('接近'));
+  const hitOversized = arr.some((x:any)=> x.metric==='oversizedRules' && String(x.message||'').includes('near threshold'));
+  const hitGhost = arr.some((x:any)=> x.metric==='ghostContext' && String(x.message||'').includes('near'));
   if (!hitOversized || !hitGhost) {
-    console.error('未发现 Oversized 或 Ghost 的接近阈值预警记录');
+    console.error('No near-threshold prewarn record found for Oversized or Ghost');
     process.exit(1);
   }
-  console.log('[ok] ghost-oversized-prewarn: 两项近阈值预警生效');
+  console.log('[ok] ghost-oversized-prewarn: both near-threshold prewarns fired');
 }
 
 main().catch(e=>{ console.error(e); process.exit(1); });

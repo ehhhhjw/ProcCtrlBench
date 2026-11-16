@@ -76,10 +76,10 @@ async function main() {
   const issues = await detector.detect();
   const issue = issues.find((item) => item.metric === 'deadStep' && item.location?.toolUseId === 'tu0');
   if (issue) {
-    console.error('Write 操作不应被判定为 deadStep:', JSON.stringify(issue, null, 2));
+    console.error('A Write operation must not be classified as a deadStep:', JSON.stringify(issue, null, 2));
     process.exit(1);
   }
-  console.log('[ok] deadstep-write-exempt: Write 不会被判定为 deadStep');
+  console.log('[ok] deadstep-write-exempt: Write is never classified as a deadStep');
 }
 
 main().catch((error) => {

@@ -1,11 +1,11 @@
-# 11基准测试计划（可复验）
+# Test Plan for the 11 Benchmarks (Reproducible)
 
-- 样本集：每类任务≥30；每任务≥5次试验（不同seed/初始提示/工具可见性）。
-- 数据采集：保存 `output/evaluation-reports/*.json` 与 `output/file-graph.json`；记录依赖版本与随机种子。
-- 验证项：
-  - DeadStep/DuplicateStep：AST符号引用、文件图谱间接引用、生效率与误报率。
-  - Thrashing：窗口阈值75%预警有效性；a/b场景区分的正确率。
-  - Wrapper/Coupling/Chain：结构性指标（SCC、序列熵）与建议注入的干预效果。
-  - Interface/Weak：差异度与分散度显著性；Prompt变异前后效应量。
-- 统计：`src/benchmark/BenchmarkRunner.ts` 输出均值±95%CI；必要时配对t检与效果量报告。
-- 通过准则：在≥80%任务上，指标的检出/改进建议具备统计显著性（p<0.05，d≥0.5）且工程师复核认可。
+- Sample set: ≥30 samples per task category; ≥5 trials per task (varying seed / initial prompt / tool visibility).
+- Data collection: persist `output/evaluation-reports/*.json` and `output/file-graph.json`; record dependency versions and random seeds.
+- Validation items:
+  - DeadStep/DuplicateStep: AST symbol references, indirect references from the file graph, effective hit rate and false positive rate.
+  - Thrashing: effectiveness of the 75% window threshold prewarn; accuracy of discriminating scenarios a/b.
+  - Wrapper/Coupling/Chain: structural metrics (SCC, sequence entropy) and the intervention effect of injected recommendations.
+  - Interface/Weak: significance of divergence and dispersion; effect size before and after prompt mutation.
+- Statistics: `src/benchmark/BenchmarkRunner.ts` reports mean ±95% CI; paired t-tests and effect-size reporting where necessary.
+- Pass criterion: on ≥80% of tasks, the detections / improvement recommendations of a metric are statistically significant (p<0.05, d≥0.5) and are endorsed by engineer review.

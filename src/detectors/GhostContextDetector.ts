@@ -9,8 +9,8 @@ import { writePrewarn } from '../utils/Prewarn';
 import { finalizeDetectorIssues } from './detector-calibration';
 
 /**
- * 幽灵上下文检测器
- * 检测已无价值但仍占用上下文的内容
+ * Ghost context detector
+ * Detects content that no longer provides value but still occupies context
  */
 export class GhostContextDetector implements IDetector {
   readonly name = 'GhostContextDetector';
@@ -40,15 +40,15 @@ export class GhostContextDetector implements IDetector {
   async detect(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 检测1: 摘要+原文共存
+    // Detection 1: summary coexisting with original content
     const summaryIssues = await this.detectSummaryDuplication();
     issues.push(...summaryIssues);
 
-    // 检测2: 不可消费的payload
+    // Detection 2: non-consumable payload
     const unusableIssues = await this.detectUnusablePayload();
     issues.push(...unusableIssues);
 
-    // 检测3: 未被引用的历史结果
+    // Detection 3: unreferenced historical result
     const unreferencedIssues = await this.detectUnreferencedHistory();
     issues.push(...unreferencedIssues);
 
@@ -56,27 +56,27 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 检测摘要+原文共存
+   * Detect summary coexisting with original content
    */
   private async detectSummaryDuplication(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 查找content-replacement记录
+    // Find content-replacement records
     const replacements = Array.from(this.sessionData.replacements.values())
       .sort((a, b) => a.timestamp - b.timestamp);
 
     for (const replacement of replacements) {
-      // 检查原始内容是否仍在上下文中
+      // Check whether the original content is still in the context
       const messageUuids = this.sessionData.messagesByMessageId.get(replacement.messageId);
 
-      // 如果存在多个片段，说明原文和摘要可能共存
+      // Multiple fragments indicate the original content and the summary may coexist
       if (messageUuids && messageUuids.length > 1) {
-        // 获取所有片段的完整信息
+        // Get the complete information for all fragments
         const messageFragments = messageUuids
           .map(uuid => this.sessionData.messages.get(uuid))
           .filter((m): m is MessageNode => m !== undefined);
 
-        // 检查它们之间的时间差
+        // Check the time difference between them
         const sortedFragments = messageFragments.sort((a: MessageNode, b: MessageNode) => a.timestamp - b.timestamp);
         const firstFragment = sortedFragments[0];
         const lastFragment = sortedFragments[sortedFragments.length - 1];
@@ -84,7 +84,7 @@ export class GhostContextDetector implements IDetector {
         const timeDiff = lastFragment.timestamp - firstFragment.timestamp;
         const steps = this.countStepsBetween(firstFragment.timestamp, lastFragment.timestamp);
 
-        // 如果共存超过2个步骤，认为是ghost context
+        // Coexisting for more than 2 steps is treated as ghost context
         if (steps > 2) {
           const originalSize = this.estimateTokenSize(replacement.originalContent);
           const replacementSize = this.estimateTokenSize(replacement.replacementContent);
@@ -99,11 +99,11 @@ export class GhostContextDetector implements IDetector {
             continue;
           }
 
-          // 预警：浪费接近阈值时提醒
+          // Prewarn: alert when the wasted tokens are near the threshold
           if (wastedTokens > this.config.thresholds.ghostContext.warningTokens * 0.9) {
             writePrewarn({
               metric: 'ghostContext',
-              message: `摘要与原文共存浪费接近阈值: wasted=${wastedTokens}`,
+              message: `summary coexisting with original content, wasted tokens near threshold: wasted=${wastedTokens}`,
               details: { wastedTokens, steps },
             });
           }
@@ -117,11 +117,11 @@ export class GhostContextDetector implements IDetector {
           issues.push({
             metric: 'ghostContext',
             severity,
-            message: `检测到摘要与原文共存: messageId ${replacement.messageId}, 浪费约 ${wastedTokens} tokens`,
+            message: `Detected summary coexisting with original content: messageId ${replacement.messageId}, approximately ${wastedTokens} tokens wasted`,
             location: {
               messageUuid: lastFragment.uuid,
             },
-            suggestion: `摘要创建后应立即移除原始内容，避免重复占用上下文`,
+            suggestion: `The original content should be removed as soon as the summary is created, to avoid occupying the context twice`,
             evidence: {
               type: 'medium',
               details: {
@@ -143,36 +143,36 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 检测不可消费的payload
+   * Detect non-consumable payload
    */
   private async detectUnusablePayload(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
 
-    // 检查所有tool-result
+    // Check all tool-results
     for (const toolResult of this.sessionData.toolResults.values()) {
       const content = this.extractContent(toolResult.content);
 
       if (!content) continue;
 
-      // 检查是否是base64或二进制内容
+      // Check whether the content is base64 or binary
       const isUnusable = this.isUnusableContent(content);
 
       if (isUnusable) {
         const tokenSize = this.estimateTokenSize(content);
 
-        // 接近阈值的预警（便于运行时提前压缩或替换为摘要）
+        // Near-threshold prewarn (lets the runtime compress early or replace the content with a summary)
         if (tokenSize > this.config.thresholds.ghostContext.warningTokens * 0.9 && tokenSize <= this.config.thresholds.ghostContext.warningTokens) {
           const { writePrewarn } = require('../utils/Prewarn');
           try {
             writePrewarn({
               metric: 'ghostContext',
-              message: `不可消费payload接近阈值: size=${tokenSize}`,
+              message: `non-consumable payload near threshold: size=${tokenSize}`,
               details: { tokenSize },
             });
           } catch {}
         }
 
-        // 如果超过阈值
+        // If the threshold is exceeded
         if (tokenSize > this.config.thresholds.ghostContext.warningTokens) {
           const severity = tokenSize > this.config.thresholds.ghostContext.errorTokens
             ? Severity.Error
@@ -183,11 +183,11 @@ export class GhostContextDetector implements IDetector {
           issues.push({
             metric: 'ghostContext',
             severity,
-            message: `检测到不可消费的大payload: ${tokenSize} tokens的${this.getContentType(content)}内容`,
+            message: `Detected large non-consumable payload: ${tokenSize} tokens of ${this.getContentType(content)} content`,
             location: {
               messageUuid: toolResult.messageUuid,
             },
-            suggestion: `对于二进制或base64内容，应在提取关键信息后立即压缩或移除原始内容`,
+            suggestion: `For binary or base64 content, the original content should be compressed or removed as soon as the key information has been extracted`,
             evidence: {
               type: 'strong',
               details: {
@@ -206,7 +206,7 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 检测未被引用的历史结果
+   * Detect unreferenced historical result
    */
   private async detectUnreferencedHistory(): Promise<DetectionIssue[]> {
     const issues: DetectionIssue[] = [];
@@ -222,11 +222,11 @@ export class GhostContextDetector implements IDetector {
 
       const subsequentMessages = this.getMessagesAfter(result.messageUuid, result.timestamp, 5);
 
-      // 检查是否被引用
+      // Check whether it is referenced
       const footprint = this.codeContext.getTextFootprint(content);
       const isReferenced = this.isContentReferencedWithFootprint(content, subsequentMessages, footprint);
 
-      // 检查是否有覆盖性摘要
+      // Check whether a covering summary exists
       const hasSummary = this.hasReplacementSummary(result.messageId, result.timestamp);
 
       if (!isReferenced && hasSummary) {
@@ -239,11 +239,11 @@ export class GhostContextDetector implements IDetector {
           issues.push({
             metric: 'ghostContext',
             severity,
-            message: `检测到未被引用的历史结果: ${tokenSize} tokens, 5步内无引用且存在摘要`,
+            message: `Detected unreferenced historical result: ${tokenSize} tokens, not referenced within 5 steps and a summary exists`,
             location: {
               messageUuid: result.messageUuid,
             },
-            suggestion: `该结果在后续步骤中未被使用，且已有摘要，可以移除原始内容`,
+            suggestion: `This result is not used in the subsequent steps and a summary already exists, so the original content can be removed`,
             evidence: {
               type: 'medium',
               details: {
@@ -263,7 +263,7 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 提取内容
+   * Extract content
    */
   private extractContent(content: any): string {
     if (typeof content === 'string') {
@@ -281,16 +281,16 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 判断是否是不可消费的内容
+   * Determine whether the content is non-consumable
    */
   private isUnusableContent(content: string): boolean {
-    // 检查base64
+    // Check base64
     const base64Pattern = /^[A-Za-z0-9+/=]{100,}$/;
     if (base64Pattern.test(content.replace(/\s/g, ''))) {
       return true;
     }
 
-    // 检查是否包含大量二进制标识
+    // Check whether it contains many binary markers
     const binaryIndicators = ['�', '\x00', '\xFF', 'binary', 'image/'];
     const binaryCount = binaryIndicators.reduce((count, indicator) => {
       return count + (content.match(new RegExp(indicator, 'g'))?.length || 0);
@@ -300,7 +300,7 @@ export class GhostContextDetector implements IDetector {
       return true;
     }
 
-    // 检查是否是超长的单行内容（可能是压缩数据）
+    // Check for extremely long single-line content (possibly compressed data)
     const lines = content.split('\n');
     const hasVeryLongLine = lines.some(line => line.length > 1000);
 
@@ -308,7 +308,7 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 获取内容类型
+   * Get content type
    */
   private getContentType(content: string): string {
     if (/^[A-Za-z0-9+/=]{100,}$/.test(content.replace(/\s/g, ''))) {
@@ -316,17 +316,17 @@ export class GhostContextDetector implements IDetector {
     }
 
     if (content.includes('�') || content.includes('\x00')) {
-      return '二进制';
+      return 'binary';
     }
 
-    return '未知格式';
+    return 'unknown format';
   }
 
   /**
-   * 估算token大小
+   * Estimate token size
    */
   private estimateTokenSize(content: string): number {
-    // 简单估算: 英文约4字符=1token, 中文约1.5字符=1token
+    // Rough estimate: about 4 English characters = 1 token, about 1.5 Chinese characters = 1 token
     const chineseChars = (content.match(/[\u4e00-\u9fa5]/g) || []).length;
     const otherChars = content.length - chineseChars;
 
@@ -334,7 +334,7 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 计算时间范围内的步骤数
+   * Count the steps within a time range
    */
   private countStepsBetween(startTime: number, endTime: number): number {
     let count = 0;
@@ -349,7 +349,7 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 获取指定时间后的消息
+   * Get the messages after a given time
    */
   private getMessagesAfter(anchorUuid: string, timestamp: number, count: number): MessageNode[] {
     if (this.sessionData.messages.has(anchorUuid)) {
@@ -363,14 +363,14 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 检查内容是否被引用
+   * Check whether the content is referenced
    */
   private isContentReferenced(content: string, messages: MessageNode[]): boolean {
     return this.isContentReferencedWithFootprint(content, messages, this.codeContext.getTextFootprint(content));
   }
 
   private isContentReferencedWithFootprint(content: string, messages: MessageNode[], footprint: CodeFootprint): boolean {
-    // 提取关键词
+    // Extract keywords
     const keywords = content
       .split(/\s+/)
       .filter(w => w.length >= 5)
@@ -379,7 +379,7 @@ export class GhostContextDetector implements IDetector {
     for (const message of messages) {
       const messageText = this.extractContent(message.content);
 
-      // 检查是否包含关键词
+      // Check whether it contains keywords
       for (const keyword of keywords) {
         if (messageText.includes(keyword)) {
           return true;
@@ -396,10 +396,10 @@ export class GhostContextDetector implements IDetector {
   }
 
   /**
-   * 检查是否有替换摘要
+   * Check whether a replacement summary exists
    */
   private hasReplacementSummary(messageId: string, afterTime: number): boolean {
-    // 从replacements Map中查找所有相关的替换记录
+    // Find all related replacement records in the replacements Map
     const replacements: ContentReplacementRecord[] = [];
     for (const replacement of this.sessionData.replacements.values()) {
       if (replacement.messageId === messageId) {

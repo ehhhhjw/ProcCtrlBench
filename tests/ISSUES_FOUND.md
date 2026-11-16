@@ -1,43 +1,43 @@
-# 发现的问题与修复方案
+# Issues Found and Fix Plan
 
-## ❌ 问题1: WrapperDetector缺少"最少调用5次"检查
+## ❌ Issue 1: WrapperDetector is missing the "at least 5 calls" check
 
-### 文档要求
+### Documentation Requirement
 
-根据 `acoder version.md` 第7.2节:
+According to section 7.2 of `acoder version.md`:
 
-> **默认判定规则**: 在同一benchmark中某wrapper被调用**不少于5次**时：
-> - 若≥80%的调用都满足上述条件，则报warning
-> - 若≥95%满足，则报error
+> **Default detection rule**: when a wrapper is called **no fewer than 5 times** within the same benchmark:
+> - if ≥80% of the calls satisfy the conditions above, report a warning
+> - if ≥95% satisfy them, report an error
 
-###当前实现问题
+### Problems in the Current Implementation
 
-**文件**: `src/detectors/WrapperDetector.ts`
+**File**: `src/detectors/WrapperDetector.ts`
 
-**问题描述**:
-- ❌ 没有检查Agent的调用次数
-- ❌ 没有实现"调用5次以上才判定"的逻辑
-- ❌ 当前对每个Agent调用都进行判定，不符合文档要求
+**Problem description**:
+- ❌ the Agent's call count is not checked
+- ❌ the "only judge when called more than 5 times" logic is not implemented
+- ❌ a verdict is currently issued for every single Agent call, which does not meet the documentation requirement
 
-### 影响
+### Impact
 
-这会导致：
-1. **误报**: 只被调用1-2次的Agent也可能被标记为wrapper
-2. **不准确**: 无法统计"多次调用中有多少比例是wrapper行为"
-3. **不符合文档**: 违反了评测标准的明确要求
+This leads to:
+1. **False positives**: an Agent called only 1-2 times may also be flagged as a wrapper
+2. **Inaccuracy**: it is impossible to measure "what proportion of multiple calls exhibits wrapper behavior"
+3. **Non-compliance with the documentation**: it violates an explicit requirement of the evaluation standard
 
-### 修复方案
+### Fix Plan
 
-需要修改 `WrapperDetector.ts` 的 `detect()` 方法:
+The `detect()` method of `WrapperDetector.ts` needs to be modified:
 
 ```typescript
 async detect(): Promise<DetectionIssue[]> {
   const issues: DetectionIssue[] = [];
 
-  // 识别所有Agent调用
+  // Identify all Agent calls
   const agentCalls = this.identifyAgentCalls();
 
-  // 按agentId分组统计
+  // Group and tally by agentId
   const agentCallGroups = new Map<string, Array<...>>();
 
   for (const agentCall of agentCalls) {
@@ -48,14 +48,14 @@ async detect(): Promise<DetectionIssue[]> {
     agentCallGroups.get(agentId)!.push(agentCall);
   }
 
-  // 对每个Agent检查调用次数
+  // Check the call count for each Agent
   for (const [agentId, calls] of agentCallGroups) {
-    // ✅ 关键修复: 只对调用≥5次的Agent进行判定
+    // ✅ Key fix: only judge Agents called ≥5 times
     if (calls.length < 5) {
-      continue; // 跳过调用次数不足的Agent
+      continue; // Skip Agents with too few calls
     }
 
-    // 分析每次调用
+    // Analyze each call
     let wrapperCount = 0;
     for (const call of calls) {
       const analysis = this.analyzeAgentCall(call);
@@ -64,10 +64,10 @@ async detect(): Promise<DetectionIssue[]> {
       }
     }
 
-    // 计算包装率
+    // Compute the wrapper rate
     const wrapperRate = wrapperCount / calls.length;
 
-    // 判定
+    // Verdict
     if (wrapperRate >= 0.80) {
       const severity = wrapperRate >= 0.95 ? Severity.Error : Severity.Warning;
       const deduction = severity === Severity.Error ? 2.0 : 1.0;
@@ -75,11 +75,11 @@ async detect(): Promise<DetectionIssue[]> {
       issues.push({
         metric: 'wrapperWorkflow',
         severity,
-        message: `检测到冗余包装工作流: Agent "${agentId}" 在${calls.length}次调用中有${wrapperCount}次(${(wrapperRate * 100).toFixed(0)}%)仅透传输入`,
+        message: `Redundant wrapper workflow detected: Agent "${agentId}" in ${calls.length} invocations merely passed input through ${wrapperCount} times (${(wrapperRate * 100).toFixed(0)}%)`,
         location: {
           messageUuid: calls[0].initiatorUuid,
         },
-        suggestion: `该Agent没有提供附加价值，考虑直接调用下游工具，或为Agent添加验证、转换等逻辑`,
+        suggestion: `This Agent provides no added value. Consider invoking the downstream tool directly, or adding validation, transformation, or similar logic to the Agent`,
         evidence: {
           type: severity === Severity.Error ? 'strong' : 'medium',
           details: {
@@ -98,27 +98,27 @@ async detect(): Promise<DetectionIssue[]> {
 }
 ```
 
-### 测试用例
+### Test Cases
 
-需要添加测试验证修复:
+Tests need to be added to verify the fix:
 
 ```typescript
 describe('WrapperDetector', () => {
-  it('应该忽略调用次数<5的Agent', async () => {
+  it('should ignore Agents with a call count < 5', async () => {
     const session = createMockSession({
       agents: [
-        { id: 'agent1', calls: 3, isWrapper: true }, // 只调用3次
+        { id: 'agent1', calls: 3, isWrapper: true }, // called only 3 times
       ]
     });
 
     const detector = new WrapperDetector(session, config);
     const issues = await detector.detect();
 
-    // 不应该报告任何问题，因为调用次数<5
+    // No issue should be reported, because the call count < 5
     expect(issues.length).toBe(0);
   });
 
-  it('应该在调用≥5次且80%是wrapper时报warning', async () => {
+  it('should report a warning when called ≥5 times with 80% wrappers', async () => {
     const session = createMockSession({
       agents: [
         { id: 'agent1', calls: 5, wrapperCalls: 4 }, // 80%
@@ -132,7 +132,7 @@ describe('WrapperDetector', () => {
     expect(issues[0].severity).toBe('warning');
   });
 
-  it('应该在调用≥5次且95%是wrapper时报error', async () => {
+  it('should report an error when called ≥5 times with 95% wrappers', async () => {
     const session = createMockSession({
       agents: [
         { id: 'agent1', calls: 20, wrapperCalls: 19 }, // 95%
@@ -150,90 +150,90 @@ describe('WrapperDetector', () => {
 
 ---
 
-## ✅ 其他检测器状态
+## ✅ Status of the Other Detectors
 
-经过仔细对照文档，其他10个检测器的实现都符合要求：
+After a careful comparison against the documentation, the implementations of the other 10 detectors all meet the requirements:
 
-### 完全符合 ✅
+### Fully Compliant ✅
 
-1. ✅ **GhostContextDetector** - 所有阈值和逻辑都符合
-2. ✅ **OversizedRulesDetector** - 2000/4000 tokens, 20%/35%比例都正确
-3. ✅ **ThrashingDetector** - 85%阈值, 2步检查, 15%payload都正确
-4. ✅ **ToolChainDetector** - 6/10次重复, 3/5轮循环都正确
-5. ✅ **DeadStepDetector** - 4维度检查, 强/中证据都正确
-6. ✅ **DuplicateStepDetector** - 0.9相似度阈值正确
-7. ✅ **LongChainDetector** - 12/20有效长度, 25/40简单长度都正确
-8. ✅ **CouplingDetector** - Tarjan SCC算法, 交替调用检测都正确
-9. ✅ **InterfaceConsistencyDetector** - 0.4/0.7差异度阈值正确
-10. ✅ **WeakToolDetector** - 60%/30%调用率阈值正确
-11. ✅ **TaskOutcomeEvaluator** - 5个完成指标的启发式检查逻辑完整
-
----
-
-## 修复优先级
-
-### 🔴 高优先级 (必须修复)
-
-1. **WrapperDetector** - 添加"最少5次调用"检查
-   - 影响: 直接违反文档要求
-   - 修复难度: 中等
-   - 估计时间: 30分钟
-
-### 🟡 中优先级 (建议修复)
-
-无
-
-### 🟢 低优先级 (可选增强)
-
-1. 添加单元测试 - 验证所有边界条件
-2. 添加集成测试 - 使用真实数据验证
-3. 性能优化 - 缓存中间结果
+1. ✅ **GhostContextDetector** - all thresholds and logic match
+2. ✅ **OversizedRulesDetector** - 2000/4000 tokens and the 20%/35% ratios are all correct
+3. ✅ **ThrashingDetector** - the 85% threshold, the 2-step check, and the 15% payload are all correct
+4. ✅ **ToolChainDetector** - 6/10 repeats and 3/5 cycle rounds are all correct
+5. ✅ **DeadStepDetector** - the 4-dimension check and the strong/medium evidence levels are all correct
+6. ✅ **DuplicateStepDetector** - the 0.9 similarity threshold is correct
+7. ✅ **LongChainDetector** - 12/20 effective length and 25/40 simple length are all correct
+8. ✅ **CouplingDetector** - Tarjan's SCC algorithm and alternating-call detection are both correct
+9. ✅ **InterfaceConsistencyDetector** - the 0.4/0.7 divergence thresholds are correct
+10. ✅ **WeakToolDetector** - the 60%/30% call-rate thresholds are correct
+11. ✅ **TaskOutcomeEvaluator** - the heuristic check logic for the 5 completion metrics is complete
 
 ---
 
-## 修复计划
+## Fix Priority
 
-### 步骤1: 修复WrapperDetector (立即执行)
+### 🔴 High Priority (must fix)
 
-1. 修改 `src/detectors/WrapperDetector.ts`
-2. 实现按agentId分组统计
-3. 添加调用次数检查 (≥5次)
-4. 计算多次调用的包装率
-5. 更新问题报告格式
+1. **WrapperDetector** - add the "at least 5 calls" check
+   - Impact: directly violates the documentation requirement
+   - Fix difficulty: medium
+   - Estimated time: 30 minutes
 
-### 步骤2: 添加测试 (后续)
+### 🟡 Medium Priority (recommended)
 
-1. 创建单元测试框架
-2. 为WrapperDetector添加测试
-3. 验证边界条件
+None
 
-### 步骤3: 验证修复 (最后)
+### 🟢 Low Priority (optional enhancements)
 
-1. 运行测试确保通过
-2. 使用真实JSONL数据验证
-3. 更新文档
+1. Add unit tests - verify all boundary conditions
+2. Add integration tests - verify with real data
+3. Performance optimization - cache intermediate results
 
 ---
 
-## 总结
+## Fix Schedule
 
-### 发现的问题
+### Step 1: Fix WrapperDetector (execute immediately)
 
-- **1个关键问题**: WrapperDetector缺少最少调用次数检查
-- **0个次要问题**
-- **10个检测器完全符合要求**
+1. Modify `src/detectors/WrapperDetector.ts`
+2. Implement grouped statistics by agentId
+3. Add the call count check (≥5 calls)
+4. Compute the wrapper rate across multiple calls
+5. Update the issue report format
 
-### 整体符合度
+### Step 2: Add Tests (follow-up)
 
-- **完全符合**: 10/11 = 90.9%
-- **需要修复**: 1/11 = 9.1%
+1. Create a unit test framework
+2. Add tests for WrapperDetector
+3. Verify boundary conditions
 
-### 修复后预期
+### Step 3: Verify the Fix (last)
 
-修复WrapperDetector后，所有11个检测器将**100%符合文档要求** ✅
+1. Run the tests and make sure they pass
+2. Verify with real JSONL data
+3. Update the documentation
 
 ---
 
-**报告生成时间**: 2026-04-07
+## Summary
 
-**下一步**: 立即修复WrapperDetector.ts
+### Issues Found
+
+- **1 critical issue**: WrapperDetector is missing the minimum call count check
+- **0 minor issues**
+- **10 detectors fully meet the requirements**
+
+### Overall Compliance
+
+- **Fully compliant**: 10/11 = 90.9%
+- **Needs fixing**: 1/11 = 9.1%
+
+### Expectation After the Fix
+
+Once WrapperDetector is fixed, all 11 detectors will be **100% compliant with the documentation requirements** ✅
+
+---
+
+**Report generated**: 2026-04-07
+
+**Next step**: fix WrapperDetector.ts immediately
