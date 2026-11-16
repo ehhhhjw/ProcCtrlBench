@@ -1,6 +1,9 @@
 # 快速开始指南
 
-本指南对应当前实现：非评分制、AST 增强、项目级文件关系增强。
+本指南对应单会话诊断层：非评分制、AST 增强、项目级文件关系增强。
+
+论文复现层（11 缺陷记分卡、η=0.70、CP、层次贝叶斯校准、Table 1-15）见
+[docs/reproducing_paper_results.md](./docs/reproducing_paper_results.md)。
 
 ## 1. 安装与编译
 

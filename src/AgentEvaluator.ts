@@ -18,8 +18,18 @@ import { ToolEcosystemEvaluator } from './evaluators/ToolEcosystemEvaluator';
 import { TaskOutcomeEvaluator } from './evaluators/TaskOutcomeEvaluator';
 import { ContextChainAnalyzer } from './analyzers/ContextChainAnalyzer';
 import { EventStreamConverter } from './analyzers/EventStreamConverter';
+import { extractDefectPosteriorRisks } from './benchmark/ProcCtrlScorecard';
+import { computePaperControlPreservation } from './benchmark/PaperControlPreservation';
 import * as fs from 'fs';
 import * as path from 'path';
+
+export interface AgentEvaluatorOptions {
+  /**
+   * 使用论文 v8 附录 A.5 的 CP 公式，而不是旧的启发式 CP。
+   * 论文复现入口默认开启；普通单会话诊断仍可保持 legacy 行为。
+   */
+  paperControlPreservation?: boolean;
+}
 
 /**
  * Agent评估器主类
@@ -30,13 +40,19 @@ export class AgentEvaluator {
   private runId: string;
   private contextChains: ContextChainAnalyzer;
   private eventStreamConverter: EventStreamConverter;
+  private options: AgentEvaluatorOptions;
 
-  constructor(sessionData: SessionData, config: EvaluationConfig = DEFAULT_EVALUATION_CONFIG) {
+  constructor(
+    sessionData: SessionData,
+    config: EvaluationConfig = DEFAULT_EVALUATION_CONFIG,
+    options: AgentEvaluatorOptions = {}
+  ) {
     this.sessionData = sessionData;
     this.config = config;
     this.runId = this.extractRunId();
     this.contextChains = new ContextChainAnalyzer(sessionData);
     this.eventStreamConverter = new EventStreamConverter(sessionData);
+    this.options = options;
   }
 
   /**
@@ -44,11 +60,12 @@ export class AgentEvaluator {
    */
   static async fromJsonlFile(
     filePath: string,
-    config: EvaluationConfig = DEFAULT_EVALUATION_CONFIG
+    config: EvaluationConfig = DEFAULT_EVALUATION_CONFIG,
+    options: AgentEvaluatorOptions = {}
   ): Promise<AgentEvaluator> {
     const parser = new JsonlParser();
     const sessionData = await parser.parseFile(filePath);
-    return new AgentEvaluator(sessionData, config);
+    return new AgentEvaluator(sessionData, config, options);
   }
 
   /**
@@ -113,6 +130,26 @@ export class AgentEvaluator {
       this.buildExecutionContextSummary(),
       eventStreamSummary
     );
+
+    if (this.options.paperControlPreservation) {
+      const risks = extractDefectPosteriorRisks(report.findings || []);
+      const paperControl = computePaperControlPreservation(this.sessionData, risks);
+      report.controlPreservation = {
+        score: paperControl.score,
+        level: paperControl.level,
+        metrics: paperControl.metrics,
+        evidence: [
+          `论文 Appendix A.5 CP: toolCalls=${paperControl.features.toolCalls}, ` +
+            `anchored=${paperControl.features.anchoredToolCalls}, ` +
+            `recovered=${paperControl.features.recoveredFailures}/${paperControl.features.failedToolCalls}, ` +
+            `checkpointed=${paperControl.features.checkpointedMutations}/${paperControl.features.mutatingOperations}, ` +
+            `escalated=${paperControl.features.escalatedFailures}/${paperControl.features.failedToolCalls}.`,
+        ],
+      };
+      report.controlPreservationSource = paperControl.source;
+      report.controlPreservationRawScore = paperControl.rawScore;
+      report.controlPreservationFeatures = paperControl.features as unknown as Record<string, number>;
+    }
 
     console.log('评估完成! 已生成非评分制诊断报告');
     console.log(`总告警: ${report.summary.totalWarnings}, 总错误: ${report.summary.totalErrors}`);

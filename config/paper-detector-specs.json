@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "procctrlbench-detector-specs-v1",
+  "source": "Paper v8 Table 3 (Appendix A)",
+  "note": "This table is the paper's executable specification. The repository's detectors are threshold/rule implementations; the codeMapping column records the closest implementation and whether it is exact.",
+  "detectors": [
+    {
+      "defect": "Ghost Context",
+      "abbreviation": "GC",
+      "dimension": "Context Management",
+      "scoreFormula": "max_{u in C(T)} rho(u) * (1 - kappa(u)) * min(1, tau(u)/10)",
+      "threshold": 0.45,
+      "exemption": "Segment u is a system prompt, pinned memory block, or active summary.",
+      "codeMapping": "src/detectors/GhostContextDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Oversized Rules",
+      "abbreviation": "OR",
+      "dimension": "Context Management",
+      "scoreFormula": "|c_prefix| / |C_max|",
+      "threshold": 0.25,
+      "exemption": "Task explicitly requires full API or schema specification injection in prefix.",
+      "codeMapping": "src/detectors/OversizedRulesDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Context Window Thrashing",
+      "abbreviation": "CWT",
+      "dimension": "Context Management",
+      "scoreFormula": "(1/n) * sum_{i=1}^{n-1} I(deltaCtx_i > 0.3 and Evict_{i+1} > 0.3) * RediscoveryRate(T)",
+      "threshold": 0.30,
+      "exemption": "Multi-file batch scanning without subsequent re-read of evicted files.",
+      "codeMapping": "src/detectors/ThrashingDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Duplicate Step",
+      "abbreviation": "DupStep",
+      "dimension": "Tool-Use Efficiency",
+      "scoreFormula": "max_{i<k} Sim(u_i, u_k) * I(deltaState(i,k) = empty)",
+      "threshold": 0.80,
+      "exemption": "Intervening file edit deltaState != empty, test rerun, or polling command.",
+      "codeMapping": "src/detectors/DuplicateStepDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Tool Call Chain",
+      "abbreviation": "TCC",
+      "dimension": "Tool-Use Efficiency",
+      "scoreFormula": "max_{w subset T} CycleScore(w) * (1 - InfoGain(w))",
+      "threshold": 0.65,
+      "exemption": "Intentional iterative pagination or directory tree traversal.",
+      "codeMapping": "src/detectors/ToolChainDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Dead Step",
+      "abbreviation": "DeS",
+      "dimension": "Tool-Use Efficiency",
+      "scoreFormula": "(1/n) * sum_i I(Ref(v_i, T_{>i}) = 0 and deltaBranch(v_i) = 0)",
+      "threshold": 0.35,
+      "exemption": "Initial exploratory status check (e.g., git status, ls) returning clean state.",
+      "codeMapping": "src/detectors/DeadStepDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Long Chain",
+      "abbreviation": "LC",
+      "dimension": "Tool-Use Efficiency",
+      "scoreFormula": "clip((1/n) * sum_i (n - n_expected(c)) / n_expected(c), 0, 1) * (1 - CkptRate(T))",
+      "threshold": 0.50,
+      "exemption": "Multi-module refactoring task with verified intermediate test checkpoints.",
+      "codeMapping": "src/detectors/LongChainDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Wrapper Workflow",
+      "abbreviation": "WW",
+      "dimension": "Workflow Architecture",
+      "scoreFormula": "(1/|W|) * sum_{w in W} I(Steps(w)=1 and Val(w)=0)",
+      "threshold": 0.50,
+      "exemption": "Security or sandbox policy enforcement wrapper mandated by the platform.",
+      "codeMapping": "src/detectors/WrapperDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Context Coupling",
+      "abbreviation": "CC",
+      "dimension": "Workflow Architecture",
+      "scoreFormula": "SCC_Ratio(G_dep) * SharedCtxDepth(T)",
+      "threshold": 0.40,
+      "exemption": "Explicit pair-programming or critic-verifier dual-agent verification loop.",
+      "codeMapping": "src/detectors/CouplingDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Inconsistent Tool Interface",
+      "abbreviation": "ITI",
+      "dimension": "Tool Ecosystem Consistency",
+      "scoreFormula": "ParamSchemaDivergence(U_sim) * MalformedCallRate(T)",
+      "threshold": 0.35,
+      "exemption": "Native OS command flags differing across standard Unix utilities.",
+      "codeMapping": "src/detectors/InterfaceConsistencyDetector.ts",
+      "fidelity": "approximate"
+    },
+    {
+      "defect": "Weak Tool",
+      "abbreviation": "WT",
+      "dimension": "Tool Ecosystem Consistency",
+      "scoreFormula": "1 - UseRate(u* | Applicable)",
+      "threshold": 0.45,
+      "exemption": "Tool u* is restricted by environment permissions or missing dependencies.",
+      "codeMapping": "src/detectors/WeakToolDetector.ts",
+      "fidelity": "approximate"
+    }
+  ]
+}

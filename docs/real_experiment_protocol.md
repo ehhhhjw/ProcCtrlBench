@@ -88,30 +88,40 @@ PROC_BENCH_DISABLE_TREE_SITTER=1 npx ts-node scripts/run-paper-offline-experimen
 - `PROC_BENCH_DISABLE_TREE_SITTER=1` 会禁用原生 tree-sitter 解析，强制 AST 提取退化为正则 fallback。
 - 这是为了保证公开大轨迹批量评测的稳定性；不影响标准化事件、11 detectors、风险和控制保持主链路执行。
 
-## 5. 与论文实验的真实对应关系
+## 5. 与论文 v8 实验的真实对应关系
 
-### 可真实完成
+### 已具备的执行链路
 
-- 三个 benchmark 的真实公开轨迹离线评测
-- 11 个 defect benchmark 的触发统计
-- 过程风险、控制保持、执行引导的结构化汇总
-- SWE 上的真实 control preservation 统计
-- defect trigger 与任务失败的离线相关性分析
+- 三个 benchmark 的真实公开轨迹离线评测；
+- 11 个 defect 的触发统计与连续证据分 `defectSignals`；
+- 论文 Appendix A.5 的 CP（`controlPreservationSource = paper-appendix-a5`）与 CPraw；
+- η=0.70 的 PB、论文口径 fragile success；
+- 11 系统语料采样与 gap report（`scripts/sample-paper-corpus.ts`）；
+- 标注模板、精确 80/40/80 划分（`create-annotation-template.ts` / `export-annotation-split.ts`）；
+- 层次贝叶斯校准（`fit-hierarchical-calibration.ts`）；
+- split-aware Table 13/14、Table 4/5、Table 3/9/11/15 脚本；
+- task-grouped paired bootstrap + Wilcoxon（`paired-system-tests.ts`）。
 
-### 当前无法严格完成
+### 仍需要作者数据才能严格完成
 
-- RQ1 Table 1 的 detector-vs-human precision / recall / F1 / AP / AUROC
-  原因：论文描述的 200 条人工标注轨迹集不在当前工作区，也没有可验证的公开标注文件。
-- RQ2 Table 2 / Figure 3 的严格 calibration 实验
-  原因：缺少同一标注集上的真实 defect label。
-- RQ3 Table 3 / Table 4 的 `Baseline / Detector-Only / W+E-Guidance` 三配置重跑对照
-  原因：当前只有公开观测轨迹，不是同一任务在三种治理配置下的 matched reruns。
-- RQ4 Table 5 / Figure 4 的 baseline vs guidance 严格对照
-  原因：当前只有 observed public runs，没有 W+E-guidance 重跑轨迹。
+| 论文产物 | 缺失输入 |
+|---|---|
+| Table 1 / Table 7 / Table 13 / Figure 7 | 200 条双标注 + 仲裁的过程级标注集 |
+| Table 2 / Table 6 / Table 8 / Table 10 / Table 12 / Table 14 | 11 系统 × 50 任务的匹配轨迹语料 |
+| Table 4 / Table 5 | 标注集 + split |
+| Table 9 | held-out intervention/breakdown 标签 |
+| Table 11 | 44 条主动干预 run |
+| Table 15 | 4 模型共同 OpenCode 环境 run |
+
+### 当前公开数据的边界
+
+- `external_data/` 中的 Android/Terminal/SWE 轨迹是公开观测运行，不是论文的 11 系统匹配矩阵；
+- `output/paper-*-experiments*` 中的旧记录缺 `pb/qDef/defectSignals`，必须用当前代码重跑；
+- `output/calibration/detector-profile.json` 是 1 条 finding 的演示拟合，不能用于论文校准。
 
 ## 6. 真实性约束
 
-- `observed-public-run` 仅表示“真实公开轨迹的离线 ProcBench 评测结果”，**不等价于**论文中的 `Baseline`。
-- 如果缺少人工标注或 matched reruns，输出必须保留 `blocked` / `partial` 状态，不能用论文中的临时数字替代。
-- `swe-control-preservation.csv` 中的 fragile-success 使用论文定义的可操作化近似：
-  成功轨迹中，`CP < 当前样本均值` 且 `Long Chain` 或 `Dead Step` 被触发。
+- `observed-public-run` 仅表示“真实公开轨迹的离线评测结果”，**不等价于**论文中的 11 个系统；
+- 如果缺少人工标注、匹配语料或干预数据，输出必须保留 `blocked` / `partial` 状态；
+- `scripts/sample-paper-corpus.ts` 只选择已有轨迹，不会补造缺失 run；
+- 论文口径 fragile success 为 `PB < 0.65` 或至少 2 个 `p_j >= 0.70`；旧的 CP 均值相对定义仅保留为描述性统计。

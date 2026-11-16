@@ -4,8 +4,38 @@
  */
 
 export { AgentEvaluator } from './AgentEvaluator';
+export type { AgentEvaluatorOptions } from './AgentEvaluator';
 export { ScoreCalculator } from './scoring/ScoreCalculator';
 export { ReportGenerator } from './scoring/ReportGenerator';
+export {
+  computePaperControlPreservation,
+} from './benchmark/PaperControlPreservation';
+export type {
+  PaperControlPreservationOptions,
+  PaperControlPreservationResult,
+} from './benchmark/PaperControlPreservation';
+export {
+  CALIBRATION_SCHEMA_VERSION,
+  calibratedRisk,
+  computeDevelopmentStats,
+  fitHierarchicalCalibration,
+  validateCalibrationProfile,
+} from './benchmark/HierarchicalCalibration';
+export type {
+  CalibrationSample,
+  PaperCalibrationProfile,
+} from './benchmark/HierarchicalCalibration';
+export {
+  DEFAULT_ETA,
+  DEFAULT_ERROR_BAND_THRESHOLD,
+  DEFAULT_FRAGILE_PB_THRESHOLD,
+  DEFAULT_MIN_ERROR_DEFECTS,
+  INFRA_DEFECT_KEYS,
+  POLICY_DEFECT_KEYS,
+  computeInfraQuality,
+  computePolicyQuality,
+  isFragileSuccess,
+} from './benchmark/ProcCtrlScorecard';
 export { fitCalibrationProfile, loadReportsFromDirectory } from './benchmark/CalibrationFitter';
 export {
   OBSERVED_DEFECT_METRICS,

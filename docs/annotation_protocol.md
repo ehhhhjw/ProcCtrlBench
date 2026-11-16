@@ -23,14 +23,14 @@ labelled defective merely because it failed, nor clean merely because it succeed
 
 For detector evaluation, `judgmentToLabel` maps `present` to a positive and both `absent` and
 `exempt` to negatives — an exempt pattern is not a defect. Exemption rates are reported separately
-in Table 5 and never folded into precision or recall.
+in Table 7 and never folded into precision or recall.
 
 ## Dual annotation and adjudication
 
 Each trajectory is labelled independently by two annotators. When the two disagree on a defect, a
 third reviewer adjudicates and the adjudicated value becomes the final label.
 
-Agreement statistics (Table 5) are computed **before** adjudication, so the raw `annotatorA` and
+Agreement statistics (Table 7) are computed **before** adjudication, so the raw `annotatorA` and
 `annotatorB` values must be preserved in the file rather than overwritten by the adjudicated value.
 
 `validateAnnotationSet` treats a disagreement without an `adjudicated` value as a blocking error;
@@ -122,6 +122,20 @@ The intended discipline is:
 
 `assertSplitDiscipline` checks that each stage only touched its own split and reports any leakage,
 so the separation can be verified rather than assumed.
+
+## Generating a template and the split
+
+```bash
+# 1. empty 11-defect template + long-format worklist from evaluated records
+npx ts-node scripts/create-annotation-template.ts   --records output/paper-corpus/paper-corpus-selection.jsonl   --output output/annotations/template.json
+
+# 2. after two annotators fill the worklist and adjudication is complete
+npx ts-node scripts/export-annotation-split.ts   --annotations output/annotations/annotations.json   --output output/annotations/split.json   --seed 20270101
+```
+
+The split script enforces exact 80/40/80 totals, stratifies by `benchmark` and `success`, and
+reports any task that crosses splits. The template is explicitly marked `template: true` and
+contains no judgments; it is not paper data.
 
 ## Validating a set before use
 

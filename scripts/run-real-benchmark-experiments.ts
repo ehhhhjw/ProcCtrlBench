@@ -91,7 +91,9 @@ async function evaluateOne(
   );
   ensureDir(targetDir);
 
-  const evaluator = new AgentEvaluator(loaded.sessionData);
+  const evaluator = new AgentEvaluator(loaded.sessionData, undefined, {
+    paperControlPreservation: true,
+  });
   const report = await evaluator.evaluateAndSave(targetDir, ['json', 'markdown']);
 
   const reportJson = fs

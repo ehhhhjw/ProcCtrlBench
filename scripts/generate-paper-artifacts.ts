@@ -5,9 +5,17 @@ import { ObservedTrajectoryRecord } from '../src/benchmark/ObservedBenchmarkExpe
 import {
   AnyArtifactOutcome,
   PaperArtifactBundle,
+  PaperSplitName,
   buildAllPaperArtifacts,
+  filterAnnotationRowsBySplit,
+  filterRecordsBySplit,
 } from '../src/benchmark/PaperArtifacts';
-import { DEFAULT_ETA, DEFAULT_FRAGILE_CP_THRESHOLD } from '../src/benchmark/ProcCtrlScorecard';
+import {
+  DEFAULT_ETA,
+  DEFAULT_ERROR_BAND_THRESHOLD,
+  DEFAULT_FRAGILE_PB_THRESHOLD,
+  DEFAULT_MIN_ERROR_DEFECTS,
+} from '../src/benchmark/ProcCtrlScorecard';
 
 /**
  * 生成 ProcCtrlBench 论文的表格与图表数据。
@@ -72,6 +80,9 @@ function toCell(value: unknown): string {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? String(value) : '';
   }
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
   return String(value);
 }
 
@@ -99,8 +110,12 @@ function writeManifest(
     eta: number;
     seed: number;
     replicates: number;
-    fragileCpThreshold: number;
+    fragilePbThreshold: number;
+    errorBandThreshold: number;
+    minErrorDefects: number;
     annotationPath?: string;
+    splitPath?: string;
+    splitFilter?: PaperSplitName;
   }
 ) {
   const generatedArtifacts = bundle.artifacts.filter((artifact) => artifact.status === 'generated');
@@ -118,13 +133,22 @@ function writeManifest(
   lines.push('');
   lines.push('## Scoring configuration');
   lines.push('');
-  lines.push(`- eta (process-quality vs control-preservation trade-off): ${context.eta}`);
-  lines.push(`- fragile-success CP threshold: ${context.fragileCpThreshold}`);
+  lines.push(`- eta (paper v8, 3.5): ${context.eta}`);
+  lines.push(
+    `- fragile success: PB < ${context.fragilePbThreshold} OR >= ${context.minErrorDefects} defects with p_j >= ${context.errorBandThreshold}`
+  );
   lines.push(`- bootstrap replicates: ${context.replicates}, seed: ${context.seed}`);
+  if (context.splitPath) {
+    lines.push(
+      `- split assignment: ${context.splitPath}${context.splitFilter ? ` (filter: ${context.splitFilter})` : ''}`
+    );
+  } else {
+    lines.push('- split assignment: (none supplied; held-out tables fall back to all records)');
+  }
   lines.push('');
   lines.push(
-    'eta and the dimension weights are this repository\'s instantiation choices; the paper does not fix a ' +
-      'specific value. Figure 8 reports the full sensitivity sweep over eta.'
+    'eta = 0.70 and the fragile-success thresholds are the paper v8 definitions. ' +
+      'Figure 8 reports the full sensitivity sweep over eta.'
   );
   lines.push('');
   lines.push(`## Generated (${generatedArtifacts.length})`);
@@ -227,25 +251,64 @@ function main() {
     throw new Error(`--eta must be a number in [0, 1], got "${args.eta}"`);
   }
   const seed = args.seed ? Number(args.seed) : 20270101;
-  const replicates = args.replicates ? Number(args.replicates) : 2000;
+  const replicates = args.replicates ? Number(args.replicates) : 10000;
 
-  const fragileCpThreshold = args['fragile-cp-threshold']
-    ? Number(args['fragile-cp-threshold'])
-    : DEFAULT_FRAGILE_CP_THRESHOLD;
-  if (!Number.isFinite(fragileCpThreshold) || fragileCpThreshold < 0 || fragileCpThreshold > 1) {
-    throw new Error(
-      `--fragile-cp-threshold must be a number in [0, 1], got "${args['fragile-cp-threshold']}"`
-    );
+  const fragilePbThreshold = args['fragile-pb-threshold']
+    ? Number(args['fragile-pb-threshold'])
+    : DEFAULT_FRAGILE_PB_THRESHOLD;
+  const errorBandThreshold = args['error-band-threshold']
+    ? Number(args['error-band-threshold'])
+    : DEFAULT_ERROR_BAND_THRESHOLD;
+  const minErrorDefects = args['min-error-defects']
+    ? Number(args['min-error-defects'])
+    : DEFAULT_MIN_ERROR_DEFECTS;
+  if (!Number.isFinite(fragilePbThreshold) || fragilePbThreshold < 0 || fragilePbThreshold > 1) {
+    throw new Error(`--fragile-pb-threshold must be a number in [0, 1]`);
+  }
+  if (!Number.isFinite(errorBandThreshold) || errorBandThreshold < 0 || errorBandThreshold > 1) {
+    throw new Error(`--error-band-threshold must be a number in [0, 1]`);
+  }
+  if (!Number.isFinite(minErrorDefects) || minErrorDefects < 1) {
+    throw new Error(`--min-error-defects must be a positive integer`);
+  }
+
+  let splitByCaseId: Record<string, PaperSplitName> | undefined;
+  const splitPath = args.split ? path.resolve(args.split) : undefined;
+  if (splitPath) {
+    const raw = JSON.parse(fs.readFileSync(splitPath, 'utf-8')) as {
+      splitByCaseId?: Record<string, PaperSplitName>;
+      assignments?: Array<{ caseId: string; split: PaperSplitName }>;
+    };
+    splitByCaseId =
+      raw.splitByCaseId ??
+      Object.fromEntries((raw.assignments ?? []).map((entry) => [entry.caseId, entry.split]));
+    console.log(`Loaded split assignment: ${splitPath}`);
+  }
+  const splitFilter = args['split-filter'] as PaperSplitName | undefined;
+  if (splitFilter && !['development', 'calibration', 'evaluation'].includes(splitFilter)) {
+    throw new Error(`--split-filter must be development / calibration / evaluation`);
   }
 
   const outDir = path.resolve(args.output || path.join(process.cwd(), 'output', 'paper-artifacts'));
   fs.mkdirSync(outDir, { recursive: true });
 
+  const devOptions = { splitByCaseId, split: 'development' as const };
+  const devRecords = splitByCaseId ? filterRecordsBySplit(records, devOptions) : [];
+  const devAnnotationRows = splitByCaseId
+    ? filterAnnotationRowsBySplit(annotationRows, devOptions)
+    : [];
+
   const bundle = buildAllPaperArtifacts(records, annotationRows, {
     eta,
     seed,
     replicates,
-    fragileCpThreshold,
+    fragilePbThreshold,
+    errorBandThreshold,
+    minErrorDefects,
+    splitByCaseId,
+    split: splitFilter,
+    devRecords,
+    devAnnotationRows,
   });
 
   console.log(
@@ -259,7 +322,17 @@ function main() {
       writeCsv(artifact.rows, path.join(outDir, `${artifact.id}.csv`));
     }
   }
-  writeManifest(bundle, outDir, { eta, seed, replicates, fragileCpThreshold, annotationPath });
+  writeManifest(bundle, outDir, {
+    eta,
+    seed,
+    replicates,
+    fragilePbThreshold,
+    errorBandThreshold,
+    minErrorDefects,
+    annotationPath,
+    splitPath,
+    splitFilter,
+  });
 
   const blockedCount = bundle.artifacts.filter((artifact) => artifact.status === 'blocked').length;
   console.log(`\nWrote ${bundle.artifacts.length - blockedCount} artifact file(s) to ${outDir}`);

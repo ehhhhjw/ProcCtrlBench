@@ -169,6 +169,64 @@ export function splitAnnotatedCases(
     }
   }
 
+  // 分层内最大余数法可能让各 split 的总数相对目标漂移 1-2 条。
+  // 论文要求精确的 80/40/80，因此在层内做“等量交换”把总数拉回目标：
+  // 从超额 split 与不足 split 各取一条同一分层的样本，交换其 split。
+  // 交换保持每个分层的样本总数不变，只修正总量。
+  const byStratum = new Map<string, Record<SplitName, SplitAssignment[]>>();
+  for (const assignment of assignments) {
+    let bucket = byStratum.get(assignment.stratum);
+    if (!bucket) {
+      bucket = {
+        development: [],
+        calibration: [],
+        evaluation: [],
+      };
+      byStratum.set(assignment.stratum, bucket);
+    }
+    bucket[assignment.split].push(assignment);
+  }
+
+  let rebalanced = 0;
+  for (let guard = 0; guard < assignments.length; guard++) {
+    const excess = SPLIT_NAMES.find((split) => counts[split] > sizes[split]);
+    const deficit = SPLIT_NAMES.find((split) => counts[split] < sizes[split]);
+    if (!excess || !deficit) break;
+
+    let swapped = false;
+    for (const bucket of byStratum.values()) {
+      if (bucket[excess].length > 0 && bucket[deficit].length > 0) {
+        const from = bucket[excess].pop()!;
+        const to = bucket[deficit].pop()!;
+        from.split = deficit;
+        to.split = excess;
+        bucket[deficit].push(from);
+        bucket[excess].push(to);
+        counts[excess]--;
+        counts[deficit]++;
+        rebalanced++;
+        swapped = true;
+        break;
+      }
+    }
+    if (!swapped) break;
+  }
+  if (rebalanced > 0) {
+    notes.push(
+      `Rebalanced ${rebalanced} stratum-internal case(s) to hit the exact ` +
+        `${sizes.development}/${sizes.calibration}/${sizes.evaluation} split sizes.`
+    );
+  }
+
+  // 重新计算 stratified counts，确保交换后的统计准确。
+  for (const split of SPLIT_NAMES) {
+    stratumCounts[split] = {};
+  }
+  for (const assignment of assignments) {
+    stratumCounts[assignment.split][assignment.stratum] =
+      (stratumCounts[assignment.split][assignment.stratum] || 0) + 1;
+  }
+
   const splitByCaseId: Record<string, SplitName> = {};
   for (const assignment of assignments) {
     splitByCaseId[assignment.caseId] = assignment.split;

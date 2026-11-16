@@ -323,8 +323,9 @@ test('buildAllPaperArtifacts reports coverage and never silently drops an artifa
   assert.equal(bundle.annotationRowCount, 0);
   assert.deepEqual(bundle.benchmarks, ['android-bench', 'terminal-bench']);
 
-  // 14 项产出：Table 1 拆两块 + Table 2-7 + Figure 2a/3/5/6/7/8
-  assert.equal(bundle.artifacts.length, 14);
+  // 19 项产出：Table 1 拆两块 + Table 2/4/5/6/7/8/10/12/13/14/15
+  // + Figure 2a/3/4/5/7/8
+  assert.equal(bundle.artifacts.length, 19);
   assert.ok(bundle.artifacts.every((artifact) => artifact.id && artifact.paperRef));
 
   // 每个 blocked 产出都必须给出原因，且行数为 0

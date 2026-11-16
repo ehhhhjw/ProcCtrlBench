@@ -2,11 +2,12 @@ import { FlatAnnotationRow } from '../adapters/AnnotationLoader';
 import {
   DetectionSample,
   bootstrapRankStability,
-  compareCalibration,
+  compareCalibrationDetailed,
   computeAgreementStats,
   computeCorrelationMatrix,
   computeDetectionMetrics,
   defectFailureAssociation,
+  estimateHardThresholdMapping,
 } from './PaperMetrics';
 import {
   PROCCTRL_DEFECT_KEYS,
@@ -18,6 +19,8 @@ import {
   SystemScorecardInput,
   aggregateScenarioScorecard,
   aggregateSystemScorecard,
+  computeInfraQuality,
+  computePolicyQuality,
   defectSpec,
   defectsOfDimension,
   isFragileSuccess,
@@ -27,10 +30,14 @@ import { ObservedTrajectoryRecord } from './ObservedBenchmarkExperiments';
 import { Rng, bootstrapCI, createSeededRng, rank } from './Stats';
 
 /**
- * 把轨迹记录与人工标注装配为论文的表格与图表数据。
+ * 把轨迹记录与人工标注装配为论文 v8 的表格与图表数据。
  *
- * 覆盖 Table 1-7 与 Figure 2a / 3 / 5 / 6 / 8；Figure 7 的可靠性曲线数据
- * 由 Table 1 的校准对比一并产出。
+ * 覆盖：
+ * - Table 1 / 2 / 4 / 5 / 6 / 7 / 8 / 10 / 12 / 13 / 14 / 15；
+ * - Figure 2a / 3 / 4 / 5 / 7 / 8。
+ *
+ * 函数名保留了早期 Table 1-7 的历史命名，但 `paperRef` 与输出文件名已对齐
+ * 论文 v8；同时提供 `buildTable8` / `buildTable6Outcome` 等别名。
  *
  * 关键约束：任何依赖人工标注的产出，在标注缺失时返回 blocked 状态并说明原因，
  * 绝不输出空表或占位数值。
@@ -119,6 +126,27 @@ export function defectPosteriorRisk(
   return typeof value === 'number' ? value : 0;
 }
 
+export function defectRisksOfRecord(
+  record: ObservedTrajectoryRecord
+): Partial<Record<ProcCtrlDefectKey, number>> {
+  if (record.defectRisks) {
+    return record.defectRisks;
+  }
+  return {
+    ghostContext: record.ghostContextPosteriorRisk,
+    oversizedRules: record.oversizedRulesPosteriorRisk,
+    thrashing: record.thrashingPosteriorRisk,
+    duplicateStep: record.duplicateStepPosteriorRisk,
+    toolCallChain: record.toolCallChainPosteriorRisk,
+    deadStep: record.deadStepPosteriorRisk,
+    longChain: record.longChainPosteriorRisk,
+    wrapperWorkflow: record.wrapperWorkflowPosteriorRisk,
+    contextCoupling: record.contextCouplingPosteriorRisk,
+    inconsistentToolInterface: record.inconsistentToolInterfacePosteriorRisk,
+    weakTool: record.weakToolPosteriorRisk,
+  };
+}
+
 /** 把轨迹记录转成记分卡聚合所需的输入 */
 export function recordToScorecardInput(record: ObservedTrajectoryRecord): SystemScorecardInput {
   return {
@@ -140,6 +168,7 @@ export function recordToScorecardInput(record: ObservedTrajectoryRecord): System
       reversibility: record.reversibility,
       authorityHandoff: record.handoffAwareness,
     },
+    defectRisks: defectRisksOfRecord(record),
     errorFindings: record.errorFindings,
   };
 }
@@ -153,6 +182,52 @@ function groupBySystem(records: ObservedTrajectoryRecord[]): Map<string, Observe
     else groups.set(key, [record]);
   }
   return groups;
+}
+
+export type PaperSplitName = 'development' | 'calibration' | 'evaluation';
+
+export interface SplitAwareOptions {
+  /** caseId 或 rawPath -> split；由 scripts/export-annotation-split.ts 产出 */
+  splitByCaseId?: Record<string, PaperSplitName>;
+  /** 只保留该 split；未提供时不筛选 */
+  split?: PaperSplitName;
+}
+
+function splitOfAnnotationRow(
+  row: FlatAnnotationRow,
+  splitByCaseId?: Record<string, PaperSplitName>
+): PaperSplitName | undefined {
+  if (!splitByCaseId) return undefined;
+  return splitByCaseId[row.caseId] ?? (row.rawPath ? splitByCaseId[row.rawPath] : undefined);
+}
+
+function splitOfRecord(
+  record: ObservedTrajectoryRecord,
+  splitByCaseId?: Record<string, PaperSplitName>
+): PaperSplitName | undefined {
+  if (!splitByCaseId) return undefined;
+  return (
+    splitByCaseId[caseKeyOfRecord(record)] ??
+    splitByCaseId[`${record.benchmark}/${record.taskId}/${record.trialId || 'single'}`]
+  );
+}
+
+export function filterRecordsBySplit(
+  records: ObservedTrajectoryRecord[],
+  options?: SplitAwareOptions
+): ObservedTrajectoryRecord[] {
+  if (!options?.split || !options.splitByCaseId) return records;
+  return records.filter((record) => splitOfRecord(record, options.splitByCaseId) === options.split);
+}
+
+export function filterAnnotationRowsBySplit(
+  rows: FlatAnnotationRow[],
+  options?: SplitAwareOptions
+): FlatAnnotationRow[] {
+  if (!options?.split || !options.splitByCaseId) return rows;
+  return rows.filter(
+    (row) => splitOfAnnotationRow(row, options.splitByCaseId) === options.split
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +388,10 @@ export function buildTable1(
       continue;
     }
 
-    const comparison = compareCalibration(dimensionSamples);
+    const comparison = compareCalibrationDetailed(dimensionSamples, {
+      binning: 'equal-mass',
+      bucketCount: 10,
+    });
     calibrationRows.push({
       dimension: DIMENSION_LABELS[dimension],
       dimensionSymbol: DIMENSION_SYMBOL_LABELS[dimension],
@@ -345,12 +423,13 @@ export function buildTable1(
 
   // 全体样本上的 Overall 行，对应 Table 1 最后一行
   const allSamples = [...samplesByDefect.values()].flat();
-  const overall = compareCalibration(
+  const overall = compareCalibrationDetailed(
     allSamples.map((sample) => ({
       label: sample.label,
       triggered: sample.triggered,
       posteriorRisk: sample.score,
-    }))
+    })),
+    { binning: 'equal-mass', bucketCount: 10 }
   );
   calibrationRows.push({
     dimension: 'Overall',
@@ -366,15 +445,24 @@ export function buildTable1(
     detection.reason = `${unmatched} annotation row(s) had no matching trajectory record and were excluded.`;
   }
 
+  const calibration = generated(
+    'table1-calibration-ece',
+    'Table 1 (right block)',
+    calibrationRows
+  );
+  calibration.reason =
+    'ECE uses 10 equal-mass bins. Hard-threshold ECE uses 0/1 predictions here; ' +
+    'dev-split empirical p_pos/p_neg mapping is available through buildTable13 with a dev split.';
+
   return {
     detection,
-    calibration: generated('table1-calibration-ece', 'Table 1 (right block)', calibrationRows),
+    calibration,
     reliability: generated('fig7-reliability-diagram', 'Figure 7', reliabilityRows),
   };
 }
 
 // ---------------------------------------------------------------------------
-// Table 2 / Table 7：跨系统记分卡与控制保持分解
+// Table 2 / Table 12：跨系统记分卡与控制保持分解
 // ---------------------------------------------------------------------------
 
 export interface Table2Row {
@@ -388,6 +476,10 @@ export interface Table2Row {
   qEco: number;
   cp: number;
   fragileSuccessRate: number;
+  /** 论文 Table 2 右块的逐来源 PB；缺失来源为 null */
+  androidBench: number | null;
+  terminalBench: number | null;
+  sweBenchVerified: number | null;
   eta: number;
 }
 
@@ -405,11 +497,13 @@ export function buildTable2(
 
   const rows: Table2Row[] = [];
   for (const [system, scoped] of groupBySystem(records)) {
-    const aggregated = aggregateSystemScorecard(
-      system,
-      scoped.map(recordToScorecardInput),
-      options
-    );
+    const inputs = scoped.map(recordToScorecardInput);
+    const aggregated = aggregateSystemScorecard(system, inputs, options);
+    const scenario = aggregateScenarioScorecard(system, inputs, options);
+    const scenarioValue = (benchmark: string): number | null => {
+      const value = scenario.byBenchmark[benchmark];
+      return typeof value === 'number' ? value : null;
+    };
     rows.push({
       system: aggregated.system,
       sampleCount: aggregated.sampleCount,
@@ -421,6 +515,9 @@ export function buildTable2(
       qEco: aggregated.qEco,
       cp: aggregated.cp,
       fragileSuccessRate: aggregated.fragileSuccessRate,
+      androidBench: scenarioValue('android-bench'),
+      terminalBench: scenarioValue('terminal-bench'),
+      sweBenchVerified: scenarioValue('swe-bench-verified'),
       eta: aggregated.eta,
     });
   }
@@ -440,7 +537,7 @@ export interface Table7Row {
 }
 
 /**
- * Table 7：控制保持五子维度分解。
+ * Table 12：控制保持五子维度分解。
  * 列名使用论文用词（correctability / authorityHandoff），内部字段仍为
  * corrigibility / handoffAwareness，映射在 recordToScorecardInput 中完成。
  */
@@ -449,7 +546,7 @@ export function buildTable7(
   options?: ScorecardOptions
 ): ArtifactOutcome<Table7Row> {
   if (records.length === 0) {
-    return blocked('table7-control-subdimensions', 'Table 7', 'No trajectory records were supplied.');
+    return blocked('table12-control-subdimensions', 'Table 12', 'No trajectory records were supplied.');
   }
 
   const rows: Table7Row[] = [];
@@ -467,11 +564,11 @@ export function buildTable7(
   }
 
   rows.sort((left, right) => right.cp - left.cp);
-  return generated('table7-control-subdimensions', 'Table 7', rows);
+  return generated('table12-control-subdimensions', 'Table 12', rows);
 }
 
 // ---------------------------------------------------------------------------
-// Table 3：场景分数
+// Table 8：场景分数
 // ---------------------------------------------------------------------------
 
 export interface Table3Row {
@@ -494,7 +591,7 @@ export function buildTable3(
   options?: ScorecardOptions
 ): ArtifactOutcome<Table3Row> {
   if (records.length === 0) {
-    return blocked('table3-scenario-scores', 'Table 3', 'No trajectory records were supplied.');
+    return blocked('table8-scenario-scores', 'Table 8', 'No trajectory records were supplied.');
   }
 
   const rows: Table3Row[] = [];
@@ -517,11 +614,11 @@ export function buildTable3(
   }
 
   rows.sort((left, right) => right.overall - left.overall);
-  return generated('table3-scenario-scores', 'Table 3', rows);
+  return generated('table8-scenario-scores', 'Table 8', rows);
 }
 
 // ---------------------------------------------------------------------------
-// Table 4：outcome 排名 vs ProcCtrlBench 排名
+// Table 6：outcome 排名 vs ProcCtrlBench 排名
 // ---------------------------------------------------------------------------
 
 export interface Table4Row {
@@ -538,7 +635,7 @@ export interface Table4Row {
 
 /**
  * 竞赛式排名：分数相同则并列，占用相同名次。
- * 论文 Table 4 中出现过并列名次，这里显式实现该语义。
+ * 论文 Table 6 中出现过并列名次，这里显式实现该语义。
  */
 function competitionRanks(scores: number[]): number[] {
   const ordered = scores
@@ -563,8 +660,8 @@ export function buildTable4(
   const withOutcome = records.filter((record) => record.success !== null);
   if (withOutcome.length === 0) {
     return blocked(
-      'table4-outcome-vs-procctrl',
-      'Table 4',
+      'table6-outcome-vs-procctrl',
+      'Table 6',
       'No trajectory carries an endpoint outcome (success is null everywhere), so an outcome-based ranking cannot be computed.'
     );
   }
@@ -603,11 +700,15 @@ export function buildTable4(
   }));
 
   rows.sort((left, right) => left.pbRank - right.pbRank);
-  return generated('table4-outcome-vs-procctrl', 'Table 4', rows);
+  const artifact = generated('table6-outcome-vs-procctrl', 'Table 6', rows);
+  artifact.reason =
+    'Outcome Score is instantiated as the endpoint success rate; the paper does not fully specify ' +
+    'its normalized outcome composite.';
+  return artifact;
 }
 
 // ---------------------------------------------------------------------------
-// Table 5：标注一致性
+// Table 7：标注一致性
 // ---------------------------------------------------------------------------
 
 export interface Table5Row {
@@ -623,8 +724,8 @@ export interface Table5Row {
 export function buildTable5(annotationRows: FlatAnnotationRow[]): ArtifactOutcome<Table5Row> {
   if (annotationRows.length === 0) {
     return blocked(
-      'table5-annotation-agreement',
-      'Table 5',
+      'table7-annotation-agreement',
+      'Table 7',
       'Annotation agreement requires a dual-annotated set; none was supplied via --annotations.'
     );
   }
@@ -673,7 +774,7 @@ export function buildTable5(annotationRows: FlatAnnotationRow[]): ArtifactOutcom
     support: overall.support,
   });
 
-  return generated('table5-annotation-agreement', 'Table 5', rows);
+  return generated('table7-annotation-agreement', 'Table 7', rows);
 }
 
 // ---------------------------------------------------------------------------
@@ -699,27 +800,42 @@ export function buildTable6(
   options?: BootstrapOptions
 ): ArtifactOutcome<Table6Row> {
   if (records.length === 0) {
-    return blocked('table6-bootstrap-rank-stability', 'Table 6', 'No trajectory records were supplied.');
+    return blocked('table10-bootstrap-rank-stability', 'Table 10', 'No trajectory records were supplied.');
   }
 
   const grouped = groupBySystem(records);
   if (grouped.size < 2) {
     return blocked(
-      'table6-bootstrap-rank-stability',
-      'Table 6',
+      'table10-bootstrap-rank-stability',
+      'Table 10',
       `Ranking stability needs at least two systems, found ${grouped.size} ` +
         '(use --variant to label each agent-model configuration distinctly).'
     );
   }
 
-  const inputs = [...grouped.entries()].map(([system, scoped]) => ({
-    system,
-    scores: scoped.map((record) => record.pb),
-    strata: scoped.map((record) => record.benchmark),
-  }));
+  const inputs = [...grouped.entries()].map(([system, scoped]) => {
+    const byTask = new Map<string, number[]>();
+    for (const record of scoped) {
+      const taskKey = `${record.benchmark}/${record.taskId}`;
+      const bucket = byTask.get(taskKey) ?? [];
+      bucket.push(record.pb);
+      byTask.set(taskKey, bucket);
+    }
+    const taskKeys = [...byTask.keys()].sort();
+    return {
+      system,
+      taskKeys,
+      scores: taskKeys.map(
+        (taskKey) =>
+          byTask.get(taskKey)!.reduce((sum, value) => sum + value, 0) /
+          byTask.get(taskKey)!.length
+      ),
+      strata: taskKeys.map((taskKey) => taskKey.split('/')[0]),
+    };
+  });
 
   const stability = bootstrapRankStability(inputs, {
-    replicates: options?.replicates ?? 2000,
+    replicates: options?.replicates ?? 10000,
     rng: createSeededRng(options?.seed ?? 20270101),
   });
 
@@ -734,7 +850,7 @@ export function buildTable6(
     }))
     .sort((left, right) => left.meanRank - right.meanRank);
 
-  return generated('table6-bootstrap-rank-stability', 'Table 6', rows);
+  return generated('table10-bootstrap-rank-stability', 'Table 10', rows);
 }
 
 export interface Fig5Row {
@@ -755,7 +871,7 @@ export function buildFig5(
     return blocked('fig5-bootstrap-ci', 'Figure 5', 'No trajectory records were supplied.');
   }
 
-  const replicates = options?.replicates ?? 2000;
+  const replicates = options?.replicates ?? 10000;
   const rng: Rng = createSeededRng(options?.seed ?? 20270101);
   const metricSelectors: Array<{ metric: Fig5Row['metric']; select: (record: ObservedTrajectoryRecord) => number }> = [
     { metric: 'PB', select: (record) => record.pb },
@@ -856,7 +972,7 @@ export interface Fig3Row {
 /** Figure 3：逐缺陷的系统画像热力图数据 */
 export function buildFig3(records: ObservedTrajectoryRecord[]): ArtifactOutcome<Fig3Row> {
   if (records.length === 0) {
-    return blocked('fig3-per-defect-profiles', 'Figure 3', 'No trajectory records were supplied.');
+    return blocked('fig4-per-defect-profiles', 'Figure 4', 'No trajectory records were supplied.');
   }
 
   const rows: Fig3Row[] = [];
@@ -878,7 +994,7 @@ export function buildFig3(records: ObservedTrajectoryRecord[]): ArtifactOutcome<
     }
   }
 
-  return generated('fig3-per-defect-profiles', 'Figure 3', rows);
+  return generated('fig4-per-defect-profiles', 'Figure 4', rows);
 }
 
 export interface Fig6Row {
@@ -892,8 +1008,8 @@ export interface Fig6Row {
 export function buildFig6(records: ObservedTrajectoryRecord[]): ArtifactOutcome<Fig6Row> {
   if (records.length < 2) {
     return blocked(
-      'fig6-inter-defect-correlation',
-      'Figure 6',
+      'fig3-inter-defect-correlation',
+      'Figure 3',
       `Pairwise correlation needs at least two trajectories, found ${records.length}.`
     );
   }
@@ -916,7 +1032,7 @@ export function buildFig6(records: ObservedTrajectoryRecord[]): ArtifactOutcome<
     }
   }
 
-  return generated('fig6-inter-defect-correlation', 'Figure 6', rows);
+  return generated('fig3-inter-defect-correlation', 'Figure 3', rows);
 }
 
 export interface Fig8Row {
@@ -961,6 +1077,460 @@ export function buildFig8(
 }
 
 // ---------------------------------------------------------------------------
+// Table 4：evaluation-point accounting
+// ---------------------------------------------------------------------------
+
+export interface Table4AccountingRow {
+  benchmarkDimension: string;
+  defectsPerTrajectory: number;
+  totalOverTrajectories: number;
+  /** 标注集中实际存在的 judgment 数（用于核对是否标满 11 类） */
+  annotatedJudgments: number;
+  supportCases: number;
+}
+
+/**
+ * 论文 Table 4：200 条轨迹 × 11 类缺陷 = 2,200 个 judgment 的记账。
+ * 行数按实际标注集计算；若标注未覆盖全部 11 类，`annotatedJudgments`
+ * 会小于理论值，便于发现不完整标注。
+ */
+export function buildTable4Accounting(
+  annotationRows: FlatAnnotationRow[]
+): ArtifactOutcome<Table4AccountingRow> {
+  if (annotationRows.length === 0) {
+    return blocked(
+      'table4-evaluation-point-accounting',
+      'Table 4',
+      'Evaluation-point accounting requires the annotation set to know how many trajectories were labelled.'
+    );
+  }
+  const caseIds = new Set(annotationRows.map((row) => row.caseId));
+  const rows: Table4AccountingRow[] = [];
+  for (const dimension of PROCCTRL_DIMENSION_KEYS) {
+    const defects = defectsOfDimension(dimension);
+    rows.push({
+      benchmarkDimension: DIMENSION_LABELS[dimension],
+      defectsPerTrajectory: defects.length,
+      totalOverTrajectories: caseIds.size * defects.length,
+      annotatedJudgments: annotationRows.filter((row) => defects.includes(row.defect)).length,
+      supportCases: caseIds.size,
+    });
+  }
+  return generated('table4-evaluation-point-accounting', 'Table 4', rows);
+}
+
+// ---------------------------------------------------------------------------
+// Table 5：per-system / per-source distribution
+// ---------------------------------------------------------------------------
+
+export interface Table5DistributionRow {
+  system: string;
+  sweTotal: number;
+  sweHeldOut: number | null;
+  terminalTotal: number;
+  terminalHeldOut: number | null;
+  androidTotal: number;
+  androidHeldOut: number | null;
+  totalTrajectories: number;
+  heldOutTrajectories: number | null;
+  endpointSuccesses: number;
+  heldOutSuccesses: number | null;
+  adjudicatedPositiveDefects: number;
+  heldOutPositiveDefects: number | null;
+}
+
+function countBenchmark(
+  records: ObservedTrajectoryRecord[],
+  benchmark: string,
+  splitByCaseId: Record<string, PaperSplitName> | undefined,
+  heldOut: boolean
+): number | null {
+  if (heldOut && !splitByCaseId) return null;
+  return records.filter(
+    (record) =>
+      record.benchmark === benchmark &&
+      (!heldOut || splitOfRecord(record, splitByCaseId) === 'evaluation')
+  ).length;
+}
+
+/**
+ * 论文 Table 5：逐系统/逐来源的 total / held-out 样本、endpoint success
+ * 和 adjudicated positive defect 数。需要标注集；held-out 列需要 split。
+ */
+export function buildTable5Distribution(
+  records: ObservedTrajectoryRecord[],
+  annotationRows: FlatAnnotationRow[],
+  options?: SplitAwareOptions
+): ArtifactOutcome<Table5DistributionRow> {
+  if (records.length === 0 || annotationRows.length === 0) {
+    return blocked(
+      'table5-sample-distribution',
+      'Table 5',
+      'Table 5 needs both evaluated trajectories and the annotation set (for adjudicated positive defects).'
+    );
+  }
+
+  const recordByKey = new Map<string, ObservedTrajectoryRecord>();
+  for (const record of records) {
+    recordByKey.set(caseKeyOfRecord(record), record);
+    recordByKey.set(`${record.benchmark}/${record.taskId}/${record.trialId || 'single'}`, record);
+  }
+
+  const systems = [...groupBySystem(records).keys()].sort();
+  const rows: Table5DistributionRow[] = [];
+  for (const system of systems) {
+    const scopedRecords = records.filter((record) => systemOf(record) === system);
+    const scopedAnnotations = annotationRows.filter((row) => {
+      const record = recordByKey.get(row.rawPath || '') ?? recordByKey.get(row.caseId);
+      return record ? systemOf(record) === system : row.system === system;
+    });
+    const heldOutAnnotations = options?.splitByCaseId
+      ? scopedAnnotations.filter(
+          (row) => splitOfAnnotationRow(row, options.splitByCaseId) === 'evaluation'
+        )
+      : [];
+    const positives = scopedAnnotations.filter((row) => row.label).length;
+    const heldOutPositives = options?.splitByCaseId
+      ? heldOutAnnotations.filter((row) => row.label).length
+      : null;
+
+    const sweTotal = countBenchmark(scopedRecords, 'swe-bench-verified', options?.splitByCaseId, false) ?? 0;
+    const terminalTotal = countBenchmark(scopedRecords, 'terminal-bench', options?.splitByCaseId, false) ?? 0;
+    const androidTotal = countBenchmark(scopedRecords, 'android-bench', options?.splitByCaseId, false) ?? 0;
+    const heldOutRecords = options?.splitByCaseId
+      ? scopedRecords.filter((record) => splitOfRecord(record, options.splitByCaseId) === 'evaluation')
+      : [];
+
+    rows.push({
+      system,
+      sweTotal,
+      sweHeldOut: countBenchmark(scopedRecords, 'swe-bench-verified', options?.splitByCaseId, true),
+      terminalTotal,
+      terminalHeldOut: countBenchmark(scopedRecords, 'terminal-bench', options?.splitByCaseId, true),
+      androidTotal,
+      androidHeldOut: countBenchmark(scopedRecords, 'android-bench', options?.splitByCaseId, true),
+      totalTrajectories: scopedRecords.length,
+      heldOutTrajectories: options?.splitByCaseId ? heldOutRecords.length : null,
+      endpointSuccesses: scopedRecords.filter((record) => record.success === true).length,
+      heldOutSuccesses: options?.splitByCaseId
+        ? heldOutRecords.filter((record) => record.success === true).length
+        : null,
+      adjudicatedPositiveDefects: positives,
+      heldOutPositiveDefects: heldOutPositives,
+    });
+  }
+
+  rows.sort((left, right) => right.totalTrajectories - left.totalTrajectories);
+  const artifact = generated('table5-sample-distribution', 'Table 5', rows);
+  if (!options?.splitByCaseId) {
+    artifact.reason = 'No split assignment supplied; held-out columns are null.';
+  }
+  return artifact;
+}
+
+// ---------------------------------------------------------------------------
+// Table 13：held-out defect detection and calibration
+// ---------------------------------------------------------------------------
+
+export interface Table13Row {
+  defect: string;
+  abbreviation: string;
+  dimension: string;
+  prevalence: number;
+  effectiveN: number;
+  f1: number;
+  auroc: number;
+  hardEce: number;
+  bayesEce: number;
+  hardBrier: number;
+  bayesBrier: number;
+  hardLogLoss: number;
+  bayesLogLoss: number;
+}
+
+export interface Table13Options extends SplitAwareOptions {
+  /** development split 的轨迹与标注，用于 hard-threshold 经验映射 */
+  devRecords?: ObservedTrajectoryRecord[];
+  devAnnotationRows?: FlatAnnotationRow[];
+}
+
+function buildSamplesForDefect(
+  records: ObservedTrajectoryRecord[],
+  annotationRows: FlatAnnotationRow[],
+  defect: ProcCtrlDefectKey
+): Array<DetectionSample & { exempt: boolean }> {
+  const recordByKey = new Map<string, ObservedTrajectoryRecord>();
+  for (const record of records) {
+    recordByKey.set(caseKeyOfRecord(record), record);
+    recordByKey.set(`${record.benchmark}/${record.taskId}/${record.trialId || 'single'}`, record);
+  }
+  const samples: Array<DetectionSample & { exempt: boolean }> = [];
+  for (const row of annotationRows) {
+    if (row.defect !== defect) continue;
+    const record = recordByKey.get(row.rawPath || '') ?? recordByKey.get(row.caseId);
+    if (!record) continue;
+    samples.push({
+      label: row.label,
+      score: defectPosteriorRisk(record, defect),
+      triggered: defectTriggered(record, defect),
+      exempt: row.exempt,
+    });
+  }
+  return samples;
+}
+
+/**
+ * 论文 Table 13：只在 80 条 held-out 轨迹上计算检测/校准指标。
+ * hard-threshold 概率使用 development split 的经验 p_pos / p_neg 映射。
+ */
+export function buildTable13(
+  records: ObservedTrajectoryRecord[],
+  annotationRows: FlatAnnotationRow[],
+  options?: Table13Options
+): ArtifactOutcome<Table13Row> {
+  const effectiveOptions: Table13Options | undefined =
+    options?.split || !options?.splitByCaseId
+      ? options
+      : { ...options, split: 'evaluation' };
+  const evalRecords = filterRecordsBySplit(records, effectiveOptions);
+  const evalRows = filterAnnotationRowsBySplit(annotationRows, effectiveOptions);
+  if (evalRecords.length === 0 || evalRows.length === 0) {
+    return blocked(
+      'table13-heldout-detection-calibration',
+      'Table 13',
+      'Held-out detection/calibration needs trajectories and annotations in the evaluation split.'
+    );
+  }
+
+  const rows: Table13Row[] = [];
+  for (const spec of PROCCTRL_TAXONOMY) {
+    const evalSamples = buildSamplesForDefect(evalRecords, evalRows, spec.key).filter(
+      (sample) => !sample.exempt
+    );
+    if (evalSamples.length === 0) continue;
+
+    const devSamples = buildSamplesForDefect(
+      options?.devRecords ?? [],
+      options?.devAnnotationRows ?? [],
+      spec.key
+    ).filter((sample) => !sample.exempt);
+    const hardMapping =
+      devSamples.length > 0 ? estimateHardThresholdMapping(devSamples) : undefined;
+    const detection = computeDetectionMetrics(evalSamples);
+    const calibration = compareCalibrationDetailed(
+      evalSamples.map((sample) => ({
+        label: sample.label,
+        triggered: sample.triggered,
+        posteriorRisk: sample.score,
+      })),
+      {
+        binning: 'equal-mass',
+        bucketCount: 10,
+        hardMapping,
+      }
+    );
+
+    rows.push({
+      defect: spec.paperName,
+      abbreviation: spec.abbreviation,
+      dimension: DIMENSION_LABELS[spec.dimension],
+      prevalence: detection.support === 0 ? 0 : detection.positives / detection.support,
+      effectiveN: detection.support,
+      f1: detection.f1,
+      auroc: detection.auroc,
+      hardEce: calibration.hardEce,
+      bayesEce: calibration.bayesEce,
+      hardBrier: calibration.hardBrier,
+      bayesBrier: calibration.bayesBrier,
+      hardLogLoss: calibration.hardLogLoss,
+      bayesLogLoss: calibration.bayesLogLoss,
+    });
+  }
+
+  if (rows.length > 0) {
+    const average = (selector: (row: Table13Row) => number) =>
+      rows.reduce((sum, row) => sum + selector(row), 0) / rows.length;
+    rows.push({
+      defect: 'Overall Mean',
+      abbreviation: '-',
+      dimension: '-',
+      prevalence: average((row) => row.prevalence),
+      effectiveN: rows.reduce((sum, row) => sum + row.effectiveN, 0),
+      f1: average((row) => row.f1),
+      auroc: average((row) => row.auroc),
+      hardEce: average((row) => row.hardEce),
+      bayesEce: average((row) => row.bayesEce),
+      hardBrier: average((row) => row.hardBrier),
+      bayesBrier: average((row) => row.bayesBrier),
+      hardLogLoss: average((row) => row.hardLogLoss),
+      bayesLogLoss: average((row) => row.bayesLogLoss),
+    });
+  }
+
+  const artifact = generated('table13-heldout-detection-calibration', 'Table 13', rows);
+  if (!options?.splitByCaseId) {
+    artifact.reason = 'No split assignment supplied; figures use whatever records/annotations were passed.';
+  }
+  if (!options?.devRecords?.length || !options?.devAnnotationRows?.length) {
+    artifact.reason = `${artifact.reason ? `${artifact.reason} ` : ''}No dev split supplied; hard-threshold ECE falls back to 0/1 predictions.`;
+  }
+  return artifact;
+}
+
+// ---------------------------------------------------------------------------
+// Table 14：held-out cross-system comparison
+// ---------------------------------------------------------------------------
+
+export interface Table14Row {
+  system: string;
+  pb: number;
+  qCtx: number;
+  qTool: number;
+  qWf: number;
+  qEco: number;
+  cp: number;
+  fragileSuccessRate: number;
+  sampleCount: number;
+  observedOutcomeCount: number;
+}
+
+/** 论文 Table 14：只在 held-out split 上重算跨系统记分卡。 */
+export function buildTable14(
+  records: ObservedTrajectoryRecord[],
+  options?: ScorecardOptions & SplitAwareOptions
+): ArtifactOutcome<Table14Row> {
+  const effectiveOptions: (ScorecardOptions & SplitAwareOptions) | undefined =
+    options?.split || !options?.splitByCaseId
+      ? options
+      : { ...options, split: 'evaluation' };
+  const heldOut = filterRecordsBySplit(records, effectiveOptions);
+  if (heldOut.length === 0) {
+    return blocked(
+      'table14-heldout-cross-system',
+      'Table 14',
+      'Held-out cross-system comparison needs trajectories in the evaluation split.'
+    );
+  }
+
+  const rows: Table14Row[] = [];
+  for (const [system, scoped] of groupBySystem(heldOut)) {
+    const aggregated = aggregateSystemScorecard(system, scoped.map(recordToScorecardInput), options);
+    rows.push({
+      system,
+      pb: aggregated.pb,
+      qCtx: aggregated.qCtx,
+      qTool: aggregated.qTool,
+      qWf: aggregated.qWf,
+      qEco: aggregated.qEco,
+      cp: aggregated.cp,
+      fragileSuccessRate: aggregated.fragileSuccessRate,
+      sampleCount: aggregated.sampleCount,
+      observedOutcomeCount: aggregated.observedOutcomeCount,
+    });
+  }
+  rows.sort((left, right) => right.pb - left.pb);
+  const artifact = generated('table14-heldout-cross-system', 'Table 14', rows);
+  if (!options?.splitByCaseId) {
+    artifact.reason = 'No split assignment supplied; Table 14 is computed over all supplied records.';
+  }
+  return artifact;
+}
+
+// ---------------------------------------------------------------------------
+// Table 15：policy/infra deconfounding
+// ---------------------------------------------------------------------------
+
+export interface Table15Row {
+  system: string;
+  taskMatchedPassRate: number | null;
+  heldOutPB: number;
+  qPolicy: number;
+  qInfra: number;
+  commonEnvPB: number | null;
+  sampleCount: number;
+  matchedTaskCount: number;
+}
+
+/**
+ * 论文 Table 15：把 agent policy 与 infrastructure 去混淆。
+ * Qpolicy / Qinfra 可直接从记录计算；task-matched pass rate 只使用
+ * 所有系统共同覆盖的 task；commonEnvPB 需要记录带 commonEnvironment=true。
+ */
+export function buildTable15(
+  records: ObservedTrajectoryRecord[],
+  options?: ScorecardOptions & SplitAwareOptions
+): ArtifactOutcome<Table15Row> {
+  const scopedRecords = filterRecordsBySplit(records, options);
+  if (scopedRecords.length === 0) {
+    return blocked('table15-policy-infra', 'Table 15', 'No trajectory records were supplied.');
+  }
+
+  const systems = [...groupBySystem(scopedRecords).keys()];
+  const tasksBySystem = new Map<string, Set<string>>();
+  for (const system of systems) {
+    tasksBySystem.set(
+      system,
+      new Set(
+        scopedRecords
+          .filter((record) => systemOf(record) === system)
+          .map((record) => `${record.benchmark}/${record.taskId}`)
+      )
+    );
+  }
+  const commonTasks =
+    systems.length === 0
+      ? new Set<string>()
+      : systems
+          .map((system) => tasksBySystem.get(system)!)
+          .reduce((intersection, current) => {
+            return new Set([...intersection].filter((task) => current.has(task)));
+          });
+
+  const rows: Table15Row[] = [];
+  for (const [system, scoped] of groupBySystem(scopedRecords)) {
+    const aggregated = aggregateSystemScorecard(system, scoped.map(recordToScorecardInput), options);
+    const meanPolicy =
+      scoped.reduce(
+        (sum, record) => sum + computePolicyQuality(defectRisksOfRecord(record)),
+        0
+      ) / scoped.length;
+    const meanInfra =
+      scoped.reduce(
+        (sum, record) => sum + computeInfraQuality(defectRisksOfRecord(record)),
+        0
+      ) / scoped.length;
+
+    const matched = scoped.filter((record) =>
+      commonTasks.has(`${record.benchmark}/${record.taskId}`)
+    );
+    const withOutcome = matched.filter((record) => record.success !== null);
+    const taskMatchedPassRate =
+      withOutcome.length === 0
+        ? null
+        : withOutcome.filter((record) => record.success === true).length / withOutcome.length;
+
+    const commonEnv = scoped.filter((record) => record.commonEnvironment === true);
+    const commonEnvPB =
+      commonEnv.length === 0
+        ? null
+        : aggregateSystemScorecard(system, commonEnv.map(recordToScorecardInput), options).pb;
+
+    rows.push({
+      system,
+      taskMatchedPassRate,
+      heldOutPB: aggregated.pb,
+      qPolicy: meanPolicy,
+      qInfra: meanInfra,
+      commonEnvPB,
+      sampleCount: scoped.length,
+      matchedTaskCount: commonTasks.size,
+    });
+  }
+  rows.sort((left, right) => right.heldOutPB - left.heldOutPB);
+  return generated('table15-policy-infra', 'Table 15', rows);
+}
+
+// ---------------------------------------------------------------------------
 // 汇总
 // ---------------------------------------------------------------------------
 
@@ -976,36 +1546,59 @@ export interface PaperArtifactBundle {
   benchmarks: string[];
 }
 
+/**
+ * 论文 v8 编号别名。
+ *
+ * 早期实现把产物按 "Table 1..7 / Fig 2a,3,5,6,8" 编号；论文 v8 的编号不同。
+ * 为保持向后兼容，旧函数名保留，同时提供与论文一致的新名字。
+ */
+export const buildTable8 = buildTable3;
+export const buildTable6Outcome = buildTable4;
+export const buildTable7Agreement = buildTable5;
+export const buildTable10Bootstrap = buildTable6;
+export const buildTable12Control = buildTable7;
+export const buildFig3Correlation = buildFig6;
+export const buildFig4Profiles = buildFig3;
+
+export interface PaperArtifactOptions extends BootstrapOptions, Table13Options {}
+
 /** 一次性构建全部论文产出 */
 export function buildAllPaperArtifacts(
   records: ObservedTrajectoryRecord[],
   annotationRows: FlatAnnotationRow[],
-  options?: BootstrapOptions
+  options?: PaperArtifactOptions
 ): PaperArtifactBundle {
-  const table1 = buildTable1(records, annotationRows);
+  const scopedRecords = filterRecordsBySplit(records, options);
+  const scopedAnnotations = filterAnnotationRowsBySplit(annotationRows, options);
+  const table1 = buildTable1(scopedRecords, scopedAnnotations);
 
   const artifacts = [
     table1.detection,
     table1.calibration,
-    buildTable2(records, options),
-    buildTable3(records, options),
-    buildTable4(records, options),
-    buildTable5(annotationRows),
-    buildTable6(records, options),
-    buildTable7(records, options),
-    buildFig2a(records),
-    buildFig3(records),
-    buildFig5(records, options),
-    buildFig6(records),
+    buildTable2(scopedRecords, options),
+    buildTable4Accounting(scopedAnnotations),
+    buildTable5Distribution(scopedRecords, scopedAnnotations, options),
+    buildTable8(scopedRecords, options),
+    buildTable6Outcome(scopedRecords, options),
+    buildTable7Agreement(scopedAnnotations),
+    buildTable10Bootstrap(scopedRecords, options),
+    buildTable12Control(scopedRecords, options),
+    buildTable13(records, annotationRows, options),
+    buildTable14(records, options),
+    buildTable15(records, options),
+    buildFig2a(scopedRecords),
+    buildFig3Correlation(scopedRecords),
+    buildFig4Profiles(scopedRecords),
+    buildFig5(scopedRecords, options),
     table1.reliability,
-    buildFig8(records),
+    buildFig8(scopedRecords),
   ] as AnyArtifactOutcome[];
 
   return {
     artifacts,
-    recordCount: records.length,
-    systemCount: groupBySystem(records).size,
-    annotationRowCount: annotationRows.length,
-    benchmarks: [...new Set(records.map((record) => record.benchmark))].sort(),
+    recordCount: scopedRecords.length,
+    systemCount: groupBySystem(scopedRecords).size,
+    annotationRowCount: scopedAnnotations.length,
+    benchmarks: [...new Set(scopedRecords.map((record) => record.benchmark))].sort(),
   };
 }

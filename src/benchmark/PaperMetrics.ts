@@ -1,6 +1,7 @@
 import {
   CalibrationPoint,
   Rng,
+  brierScore,
   expectedCalibrationError,
   mean,
   pearson,
@@ -17,9 +18,9 @@ import { CalibrationBucket } from '../types/evaluation.types';
  * 覆盖：
  * - Table 1 左块：逐缺陷 precision / recall / F1 / AP / AUROC
  * - Table 1 右块：维度级 ECE（hard 阈值 vs 校准后验）
- * - Table 5：标注一致性（raw agreement / Cohen's kappa / 豁免率 / 仲裁率）
- * - Table 6：bootstrap 排名稳定性
- * - Figure 6：缺陷间相关矩阵
+ * - Table 7：标注一致性（raw agreement / Cohen's kappa / 豁免率 / 仲裁率）
+ * - Table 10：bootstrap 排名稳定性
+ * - Figure 3：缺陷间相关矩阵
  * - Figure 7：reliability diagram（复用 Stats.reliabilityDiagram）
  *
  * 本模块只做统计计算，不涉及 I/O，也不内置任何论文数值。
@@ -222,7 +223,7 @@ export interface AgreementStats {
   adjudicationRate: number;
 }
 
-/** 计算标注一致性统计（论文 Table 5）。一致性在仲裁前计算。 */
+/** 计算标注一致性统计（论文 Table 7）。一致性在仲裁前计算。 */
 export function computeAgreementStats(pairs: AnnotationPair[]): AgreementStats {
   const support = pairs.length;
   if (support === 0) {
@@ -287,6 +288,152 @@ export function compareCalibration(
   };
 }
 
+/**
+ * 论文 v8 附录 B.3：ECE 使用 M = 10 个 equal-mass（分位数）bin，
+ * 而不是 equal-width bin，以避免低 prevalence 缺陷出现空 bin。
+ */
+export type CalibrationBinning = 'equal-width' | 'equal-mass';
+
+export function logLoss(points: CalibrationPoint[]): number {
+  if (points.length === 0) return 0;
+  return (
+    points.reduce((sum, point) => {
+      const p = Math.min(1 - 1e-12, Math.max(1e-12, point.predicted));
+      return sum - (point.observed === 1 ? Math.log(p) : Math.log(1 - p));
+    }, 0) / points.length
+  );
+}
+
+export function equalMassReliabilityDiagram(
+  points: CalibrationPoint[],
+  bucketCount = 10
+): CalibrationBucket[] {
+  if (points.length === 0) return [];
+  const safeBucketCount = Math.max(1, Math.min(bucketCount, points.length));
+  const ordered = [...points].sort((left, right) => left.predicted - right.predicted);
+  const buckets: CalibrationBucket[] = [];
+
+  for (let index = 0; index < safeBucketCount; index++) {
+    const start = Math.floor((index * ordered.length) / safeBucketCount);
+    const end = Math.floor(((index + 1) * ordered.length) / safeBucketCount);
+    const scoped = ordered.slice(start, end);
+    const observedCount = scoped.filter((point) => point.observed === 1).length;
+    const meanPredictedRisk = scoped.length === 0 ? 0 : mean(scoped.map((point) => point.predicted));
+    const observedRate = scoped.length === 0 ? 0 : observedCount / scoped.length;
+    buckets.push({
+      index,
+      lowerBound: scoped.length === 0 ? 0 : scoped[0].predicted,
+      upperBound: scoped.length === 0 ? 0 : scoped[scoped.length - 1].predicted,
+      sampleCount: scoped.length,
+      meanPredictedRisk,
+      observedRate,
+      absoluteGap: Math.abs(meanPredictedRisk - observedRate),
+    });
+  }
+  return buckets;
+}
+
+export function expectedCalibrationErrorEqualMass(
+  points: CalibrationPoint[],
+  bucketCount = 10
+): number {
+  if (points.length === 0) return 0;
+  const buckets = equalMassReliabilityDiagram(points, bucketCount);
+  return buckets.reduce(
+    (sum, bucket) => sum + (bucket.sampleCount / points.length) * bucket.absoluteGap,
+    0
+  );
+}
+
+export interface HardThresholdMapping {
+  /** 论文 B.3 的 p_pos = Pr(y=1 | s >= tau)，在 dev split 上估计 */
+  positiveProbability: number;
+  /** 论文 B.3 的 p_neg = Pr(y=1 | s < tau)，在 dev split 上估计 */
+  negativeProbability: number;
+  support: number;
+}
+
+/**
+ * 论文 B.3：把 hard trigger 映射到 dev split 上的经验 precision /
+ * false-omission rate，Laplace 平滑 epsilon = 1e-3。
+ */
+export function estimateHardThresholdMapping(
+  samples: Array<{ label: boolean; triggered: boolean }>
+): HardThresholdMapping {
+  const epsilon = 1e-3;
+  const positive = samples.filter((sample) => sample.triggered);
+  const negative = samples.filter((sample) => !sample.triggered);
+  const positiveHits = positive.filter((sample) => sample.label).length;
+  const negativeHits = negative.filter((sample) => sample.label).length;
+  return {
+    positiveProbability: (positiveHits + epsilon) / (positive.length + 2 * epsilon),
+    negativeProbability: (negativeHits + epsilon) / (negative.length + 2 * epsilon),
+    support: samples.length,
+  };
+}
+
+export interface DetailedCalibrationComparison extends CalibrationComparison {
+  hardBrier: number;
+  bayesBrier: number;
+  hardLogLoss: number;
+  bayesLogLoss: number;
+  hardMapping?: HardThresholdMapping;
+}
+
+/**
+ * 论文口径的校准对比：equal-mass ECE + hard threshold 的 dev 经验映射 +
+ * Brier / Log-Loss。
+ */
+export function compareCalibrationDetailed(
+  samples: Array<{ label: boolean; triggered: boolean; posteriorRisk: number }>,
+  options: {
+    bucketCount?: number;
+    binning?: CalibrationBinning;
+    hardMapping?: HardThresholdMapping;
+  } = {}
+): DetailedCalibrationComparison {
+  const bucketCount = options.bucketCount ?? 10;
+  const binning = options.binning ?? 'equal-mass';
+  const hardMapping = options.hardMapping;
+
+  const hardPoints: CalibrationPoint[] = samples.map((sample) => ({
+    predicted: sample.triggered
+      ? hardMapping?.positiveProbability ?? 1
+      : hardMapping?.negativeProbability ?? 0,
+    observed: sample.label ? 1 : 0,
+  }));
+  const bayesPoints: CalibrationPoint[] = samples.map((sample) => ({
+    predicted: sample.posteriorRisk,
+    observed: sample.label ? 1 : 0,
+  }));
+
+  const computeEce = (points: CalibrationPoint[]) =>
+    binning === 'equal-mass'
+      ? expectedCalibrationErrorEqualMass(points, bucketCount)
+      : expectedCalibrationError(points, bucketCount);
+  const diagram = (points: CalibrationPoint[]) =>
+    binning === 'equal-mass'
+      ? equalMassReliabilityDiagram(points, bucketCount)
+      : reliabilityDiagram(points, bucketCount);
+
+  const hardEce = computeEce(hardPoints);
+  const bayesEce = computeEce(bayesPoints);
+
+  return {
+    hardEce,
+    bayesEce,
+    improvement: hardEce - bayesEce,
+    hardBuckets: diagram(hardPoints),
+    bayesBuckets: diagram(bayesPoints),
+    support: samples.length,
+    hardBrier: brierScore(hardPoints),
+    bayesBrier: brierScore(bayesPoints),
+    hardLogLoss: logLoss(hardPoints),
+    bayesLogLoss: logLoss(bayesPoints),
+    hardMapping,
+  };
+}
+
 /** 一个系统在若干样本上的分数序列，用于 bootstrap 排名 */
 export interface RankStabilityInput {
   system: string;
@@ -297,6 +444,12 @@ export interface RankStabilityInput {
    * 缺省时视为单一层。
    */
   strata?: string[];
+  /**
+   * 与 scores 等长且顺序对齐的 task key（benchmark/taskId）。
+   * 若所有系统共享同一组 taskKeys，bootstrap 会做 task-grouped paired
+   * 重采样（论文口径）；否则退化为各系统独立分层重采样。
+   */
+  taskKeys?: string[];
 }
 
 export interface RankStabilityRow {
@@ -331,7 +484,7 @@ function groupIndicesByStratum(strata: string[] | undefined, length: number): nu
 }
 
 /**
- * 分层 bootstrap 排名稳定性（论文 Table 6）。
+ * 分层 bootstrap 排名稳定性（论文 Table 10）。
  *
  * 每轮在每个系统各自的分层内做有放回重采样，重算该系统均分后对全部系统排名，
  * 统计 mean rank / rank std / Top-1 / Top-3 频率。
@@ -359,6 +512,16 @@ export function bootstrapRankStability(
     }));
   }
 
+  const pairedTaskKeys =
+    usable.every(
+      (input) =>
+        input.taskKeys &&
+        input.taskKeys.length === input.scores.length &&
+        input.taskKeys.join('') === usable[0].taskKeys!.join('')
+    )
+      ? usable[0].taskKeys!
+      : undefined;
+
   const strataIndices = usable.map((input) =>
     groupIndicesByStratum(input.strata, input.scores.length)
   );
@@ -371,16 +534,25 @@ export function bootstrapRankStability(
   }
 
   for (let replicate = 0; replicate < replicates; replicate++) {
-    const replicateScores = usable.map((input, systemIndex) => {
-      const resampled: number[] = [];
-      for (const stratum of strataIndices[systemIndex]) {
-        for (let pick = 0; pick < stratum.length; pick++) {
-          const chosen = stratum[Math.floor(rng() * stratum.length)];
-          resampled.push(input.scores[chosen]);
-        }
-      }
-      return { system: input.system, score: mean(resampled) };
-    });
+    const pairedIndices = pairedTaskKeys
+      ? pairedTaskKeys.map(() => Math.floor(rng() * pairedTaskKeys.length))
+      : undefined;
+    const replicateScores = pairedTaskKeys
+      ? usable.map((input) => {
+          // task-grouped paired resampling: 同一组 task 索引同时作用于所有系统
+          const resampled = pairedIndices!.map((index) => input.scores[index]);
+          return { system: input.system, score: mean(resampled) };
+        })
+      : usable.map((input, systemIndex) => {
+          const resampled: number[] = [];
+          for (const stratum of strataIndices[systemIndex]) {
+            for (let pick = 0; pick < stratum.length; pick++) {
+              const chosen = stratum[Math.floor(rng() * stratum.length)];
+              resampled.push(input.scores[chosen]);
+            }
+          }
+          return { system: input.system, score: mean(resampled) };
+        });
 
     const ordered = [...replicateScores].sort((left, right) =>
       higherIsBetter ? right.score - left.score : left.score - right.score
@@ -415,7 +587,7 @@ export interface CorrelationMatrix {
 }
 
 /**
- * 缺陷间相关矩阵（论文 Figure 6）。
+ * 缺陷间相关矩阵（论文 Figure 3）。
  *
  * 输入为 key -> 逐轨迹序列，各序列需等长且按同一轨迹顺序对齐。
  * 论文用于检验各缺陷是否塌缩为单一潜在信号，因此默认使用 Spearman

@@ -2,7 +2,9 @@
 
 This walks through evaluating a single agent-model configuration across the three task sources and
 feeding the result into ProcCtrlBench. Repeat it once per configuration you want to compare — the
-cross-system tables (Table 2/3/4/6/7) need one run per system, each with a distinct `--variant`.
+cross-system tables (Table 2, 6, 8, 10, 12, 14, 15) need one run per system, each with a distinct
+`--variant`. The paper's composition is 11 systems / 50 tasks / 200 runs; use
+`scripts/sample-paper-corpus.ts` to select and validate it.
 
 ## 1. Configure the model
 
@@ -90,10 +92,13 @@ PROC_BENCH_DISABLE_TREE_SITTER=1 npx ts-node scripts/run-paper-offline-experimen
   --swe-root      /path/to/swe-trajectories \
   --output output/runs/my-model \
   --variant "My Agent / my-model" \
+  --calibration-profile output/calibration/hierarchical.json \
   --resume true --quiet true --save-reports true
 ```
 
-Pass only the roots you actually ran; the others can be omitted.
+Pass only the roots you actually ran; the others can be omitted. `--calibration-profile` is optional
+until Step 3 of the reproduction guide has produced a profile; without it the fixed heuristic
+posterior-risk model is used.
 
 ### What you get
 
@@ -111,25 +116,32 @@ Key columns in `trajectory-records.csv`:
 
 - Identity: `variant`, `benchmark`, `taskId`, `trialId`, `status`, `success`
 - Cost: `tokens`, `costUsd`
-- Scorecard: `qCtx`, `qTool`, `qWf`, `qEco`, `qDef`, `pb`, `pbEta`
+- Scorecard: `qCtx`, `qTool`, `qWf`, `qEco`, `qDef`, `pb` (eta = 0.70), `pbEta`
 - Risk: `overallRisk`, `averagePosteriorRisk`, `totalWarnings`, `totalErrors`
-- Control: `controlPreservation`, `controlLevel`, `interpretability`, `interruptibility`,
-  `corrigibility`, `reversibility`, `handoffAwareness`
+- Control: `controlPreservation`, `controlPreservationSource`, `controlPreservationRaw`,
+  `controlLevel`, `interpretability`, `interruptibility`, `corrigibility`, `reversibility`,
+  `handoffAwareness`
 - Per defect: `<defect>PosteriorRisk`, `<defect>Warnings`, `<defect>Errors`, `<defect>Triggered`
+- Calibration: `defectSignals`, `defectRisks`, `errorBandDefectCount`
 
 Note the internal control-preservation names: `corrigibility` and `handoffAwareness` correspond to
-the paper's **correctability** and **authority handoff**. The renaming happens in the Table 7 output.
+the paper's **correctability** and **authority handoff**. The renaming happens in the Table 12
+output. `controlPreservationSource` should be `paper-appendix-a5` for benchmark runs.
 
 ## 5. Build the paper artifacts
 
 ```bash
 npx ts-node scripts/generate-paper-artifacts.ts \
   --records output/runs/my-model/trajectory-records.jsonl \
+  --annotations output/annotations/annotations.json \
+  --split output/annotations/split.json \
+  --eta 0.70 \
   --output output/paper-artifacts
 ```
 
-Add `--records a.jsonl,b.jsonl,...` to compare systems, and `--annotations` to unblock Table 1,
-Table 5, and Figure 7. See [reproducing_paper_results.md](reproducing_paper_results.md).
+Add `--records a.jsonl,b.jsonl,...` to compare systems. `--annotations` unblocks Tables 1, 4, 5, 7,
+13 and Figure 7; `--split` makes Tables 13/14 genuinely held-out. See
+[reproducing_paper_results.md](reproducing_paper_results.md).
 
 ## Where to look first
 

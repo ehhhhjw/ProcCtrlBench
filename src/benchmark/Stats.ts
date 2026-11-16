@@ -214,3 +214,86 @@ export function wilsonInterval(
     hi: Math.min(1, center + spread),
   };
 }
+
+/** 标准正态 CDF（Abramowitz-Stegun 7.1.26 近似） */
+export function normalCdf(value: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(value));
+  const d = 0.3989423 * Math.exp((-value * value) / 2);
+  const prob =
+    d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return value >= 0 ? 1 - prob : prob;
+}
+
+export interface WilcoxonResult {
+  n: number;
+  statistic: number;
+  z: number;
+  pValue: number;
+  meanDifference: number;
+  medianDifference: number;
+}
+
+/**
+ * 配对 Wilcoxon signed-rank 检验（正态近似，带连续性校正）。
+ *
+ * 论文 v8 用 task-grouped paired Wilcoxon 检验系统分离。n 为任务对数；
+ * 对 n < 10 的正态近似只作参考，报告时应同时给出 bootstrap CI。
+ */
+export function wilcoxonSignedRank(a: number[], b: number[]): WilcoxonResult {
+  const nPair = Math.min(a.length, b.length);
+  const diffs: number[] = [];
+  for (let index = 0; index < nPair; index++) {
+    const diff = a[index] - b[index];
+    if (Math.abs(diff) > 1e-12) diffs.push(diff);
+  }
+  const n = diffs.length;
+  if (n === 0) {
+    return { n: 0, statistic: 0, z: 0, pValue: 1, meanDifference: 0, medianDifference: 0 };
+  }
+
+  const ordered = diffs
+    .map((diff, index) => ({ diff, abs: Math.abs(diff), index }))
+    .sort((left, right) => left.abs - right.abs);
+
+  const ranks = new Array<number>(n);
+  let cursor = 0;
+  while (cursor < ordered.length) {
+    let end = cursor + 1;
+    while (end < ordered.length && Math.abs(ordered[end].abs - ordered[cursor].abs) < 1e-12) {
+      end++;
+    }
+    const averageRank = (cursor + 1 + end) / 2;
+    for (let position = cursor; position < end; position++) {
+      ranks[position] = averageRank;
+    }
+    cursor = end;
+  }
+
+  let wPlus = 0;
+  let wMinus = 0;
+  ordered.forEach((entry, position) => {
+    if (entry.diff > 0) wPlus += ranks[position];
+    else wMinus += ranks[position];
+  });
+  const statistic = Math.min(wPlus, wMinus);
+
+  const expected = (n * (n + 1)) / 4;
+  const variance = (n * (n + 1) * (2 * n + 1)) / 24;
+  const z = variance > 0 ? (statistic - expected + 0.5) / Math.sqrt(variance) : 0;
+  const pValue = Math.min(1, 2 * (1 - normalCdf(Math.abs(z))));
+
+  const sortedDiffs = [...diffs].sort((left, right) => left - right);
+  const medianDifference =
+    sortedDiffs.length % 2 === 1
+      ? sortedDiffs[(sortedDiffs.length - 1) / 2]
+      : (sortedDiffs[sortedDiffs.length / 2 - 1] + sortedDiffs[sortedDiffs.length / 2]) / 2;
+
+  return {
+    n,
+    statistic,
+    z,
+    pValue,
+    meanDifference: mean(diffs),
+    medianDifference,
+  };
+}

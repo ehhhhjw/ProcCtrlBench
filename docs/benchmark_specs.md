@@ -1,6 +1,11 @@
 # 评测基准方案总览
 
-本文整合当前实现下 11 个评测基准的定义、信号、阈值、误报控制和整改建议。当前实现是非评分制，issue 的严重度用于诊断和排序，不生成总分。
+本文整合当前实现下 11 个评测基准的定义、信号、阈值、误报控制和整改建议。诊断层是非评分制，issue 的严重度用于诊断和排序，不生成总分。
+
+论文 v8 Table 3 的可执行规格（连续分数公式、`tau_j`、exemption 规则）在
+[config/paper-detector-specs.json](../config/paper-detector-specs.json)，可用
+`scripts/export-detector-specs.ts` 导出。当前 detector 与论文公式的对应关系标记为
+`approximate`，严格复现需要按 Table 3 移植公式并在 80 条 development 轨迹上重新调参。
 
 ## 通用增强
 

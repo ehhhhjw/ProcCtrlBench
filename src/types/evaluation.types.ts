@@ -65,7 +65,7 @@ export interface CalibrationBucket {
   meanPredictedRisk: number;
   observedRate: number;
   absoluteGap: number;
-  confidenceInterval: {
+  confidenceInterval?: {
     lo: number;
     hi: number;
   };
@@ -373,6 +373,12 @@ export interface EvaluationReport {
   findings: ProcessFinding[];
   risk: RiskSummary;
   controlPreservation: ControlPreservationSummary;
+  /** 当前 CP 的来源：legacy 启发式或论文 Appendix A.5 */
+  controlPreservationSource?: 'legacy' | 'paper-appendix-a5';
+  /** 论文 Appendix C.10 的纯特征 CPraw（去掉 p_j 惩罚项） */
+  controlPreservationRawScore?: number;
+  /** 论文口径 CP 的原始特征计数，便于审计 */
+  controlPreservationFeatures?: Record<string, number>;
   executionGuidance: ExecutionGuidanceSummary;
   summary: {
     totalWarnings: number;
@@ -410,6 +416,21 @@ export interface EvaluationEvent {
 /**
  * 评估配置
  */
+/** 论文层次贝叶斯校准参数在评测阶段的最小结构 */
+export interface PaperCalibrationParameter {
+  alpha: number;
+  beta: number;
+  gammaByBenchmark: Record<string, number>;
+  zMean: number;
+  zStd: number;
+}
+
+export interface PaperCalibrationConfig {
+  /** 当前轨迹所属 benchmark，用于选择 gamma_c,d */
+  benchmark?: string;
+  defects: Record<string, PaperCalibrationParameter>;
+}
+
 export interface EvaluationConfig {
   // 阈值配置
   thresholds: {
@@ -462,4 +483,9 @@ export interface EvaluationConfig {
     profileName?: string;
     calibrationSource?: string;
   };
+  /**
+   * 可选：论文层次贝叶斯校准参数。提供时，posteriorRisk 由
+   * sigmoid(alpha + beta*z + gamma) 计算，而不是默认启发式 logit。
+   */
+  paperCalibration?: PaperCalibrationConfig;
 }

@@ -562,6 +562,23 @@ export class ScoreCalculator {
   }
 
   private estimatePosteriorRisk(issue: DetectionIssue, detectorScore: number, canonicalMetric: string): number {
+    const calibration = this.config.paperCalibration;
+    const parameter = calibration?.defects?.[canonicalMetric];
+    if (calibration && parameter) {
+      const signal = Number.isFinite(issue.normalizedSignal)
+        ? Number(issue.normalizedSignal)
+        : detectorScore;
+      const exempt = (issue.exemptionsApplied?.length ?? 0) > 0;
+      // 论文 v8 3.4：exempt 是"非缺陷"，后验风险被确定性压到 < 0.01。
+      if (exempt) return 0.001;
+      const z = (signal - parameter.zMean) / Math.max(parameter.zStd, 1e-6);
+      const gamma =
+        parameter.gammaByBenchmark[calibration.benchmark ?? ''] ??
+        parameter.gammaByBenchmark.unknown ??
+        0;
+      return this.clamp(this.sigmoid(parameter.alpha + parameter.beta * z + gamma));
+    }
+
     const prior = issue.baselineRisk ?? this.config.riskModel.metricPriors[canonicalMetric] ?? 0.32;
     const evidenceWeight = this.resolveEvidenceWeight(issue.evidence?.type);
     const severityAnchor = this.config.riskModel.severityAnchors[issue.severity] || 0.5;

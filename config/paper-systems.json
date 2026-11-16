@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "procctrlbench-paper-systems-v1",
+  "description": "Paper v8 Table 5 composition: 200 trajectories, 11 agent-model systems, 50 tasks, 80 held-out.",
+  "note": "Table 5 lists 80 held-out in its total, but the per-system held-out cells sum to 78 (Terminal-Bench held-out cells sum to 22, not 24). This config follows the row-level cells (78); the discrepancy is recorded for reproducibility.",
+  "heldOutTotalFromRows": 78,
+  "paperReportedHeldOutTotal": 80,
+  "taskSources": {
+    "swe-bench-verified": { "tasks": 25, "heldOutTasks": 10, "trajectories": 100, "heldOut": 40 },
+    "terminal-bench": { "tasks": 15, "heldOutTasks": 6, "trajectories": 60, "heldOut": 24 },
+    "android-bench": { "tasks": 10, "heldOutTasks": 4, "trajectories": 40, "heldOut": 16 }
+  },
+  "splits": { "development": 80, "calibration": 40, "evaluation": 80 },
+  "splitTaskRatios": { "development": 2, "calibration": 1, "evaluation": 2 },
+  "systems": [
+    {
+      "name": "Claude Code / Sonnet 4.6",
+      "family": "Claude Code",
+      "model": "Claude Sonnet 4.6",
+      "counts": {
+        "swe-bench-verified": { "total": 10, "heldOut": 4 },
+        "terminal-bench": { "total": 6, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 2 }
+      },
+      "total": 20,
+      "heldOut": 8
+    },
+    {
+      "name": "Codex CLI / GPT-5.4",
+      "family": "Codex CLI",
+      "model": "GPT-5.4",
+      "counts": {
+        "swe-bench-verified": { "total": 10, "heldOut": 4 },
+        "terminal-bench": { "total": 6, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 2 }
+      },
+      "total": 20,
+      "heldOut": 8
+    },
+    {
+      "name": "Claude Code / Sonnet 4.5",
+      "family": "Claude Code",
+      "model": "Claude Sonnet 4.5",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 4 },
+        "terminal-bench": { "total": 5, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 1 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "Codex CLI / GPT-5",
+      "family": "Codex CLI",
+      "model": "GPT-5",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 4 },
+        "terminal-bench": { "total": 5, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 1 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "Qoder / Ultimate",
+      "family": "Qoder",
+      "model": "Ultimate",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 3 },
+        "terminal-bench": { "total": 5, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 2 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "OpenCode / GPT-5.4",
+      "family": "OpenCode",
+      "model": "GPT-5.4",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 4 },
+        "terminal-bench": { "total": 6, "heldOut": 2 },
+        "android-bench": { "total": 3, "heldOut": 1 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "Claude Code / Sonnet 4",
+      "family": "Claude Code",
+      "model": "Claude Sonnet 4",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 3 },
+        "terminal-bench": { "total": 5, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 2 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "OpenCode / GPT-5",
+      "family": "OpenCode",
+      "model": "GPT-5",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 4 },
+        "terminal-bench": { "total": 6, "heldOut": 2 },
+        "android-bench": { "total": 3, "heldOut": 1 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "Claude Code / Qwen3 Coder Plus",
+      "family": "Claude Code",
+      "model": "Qwen3 Coder Plus",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 3 },
+        "terminal-bench": { "total": 5, "heldOut": 2 },
+        "android-bench": { "total": 4, "heldOut": 2 }
+      },
+      "total": 18,
+      "heldOut": 7
+    },
+    {
+      "name": "OpenCode / qwen3.5-plus",
+      "family": "OpenCode",
+      "model": "qwen3.5-plus",
+      "counts": {
+        "swe-bench-verified": { "total": 9, "heldOut": 4 },
+        "terminal-bench": { "total": 5, "heldOut": 2 },
+        "android-bench": { "total": 3, "heldOut": 1 }
+      },
+      "total": 17,
+      "heldOut": 7
+    },
+    {
+      "name": "OpenCode / Qwen3 Coder Plus",
+      "family": "OpenCode",
+      "model": "Qwen3 Coder Plus",
+      "counts": {
+        "swe-bench-verified": { "total": 8, "heldOut": 3 },
+        "terminal-bench": { "total": 6, "heldOut": 2 },
+        "android-bench": { "total": 3, "heldOut": 1 }
+      },
+      "total": 17,
+      "heldOut": 6
+    }
+  ]
+}

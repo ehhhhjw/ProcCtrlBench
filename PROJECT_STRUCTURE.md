@@ -118,7 +118,22 @@ src/
   - 聚合多份报告
   - 输出平均告警数、平均错误数和 95% CI
 - [src/benchmark/Stats.ts](./src/benchmark/Stats.ts)
-  - 统计计算
+  - 统计计算（含 bootstrap / Wilcoxon）
+- [src/benchmark/ProcCtrlScorecard.ts](./src/benchmark/ProcCtrlScorecard.ts)
+  - Qctx/Qtool/Qwf/Qeco/CP/PB 记分卡，η=0.70，论文口径 fragile success
+- [src/benchmark/PaperControlPreservation.ts](./src/benchmark/PaperControlPreservation.ts)
+  - 论文 Appendix A.5 的五子维度 CP 与 CPraw
+- [src/benchmark/HierarchicalCalibration.ts](./src/benchmark/HierarchicalCalibration.ts)
+  - dev z-normalize、cal 拟合 α/β/γ 的层次贝叶斯校准
+- [src/benchmark/PaperArtifacts.ts](./src/benchmark/PaperArtifacts.ts)
+  - Table 1/2/4/5/6/7/8/10/12/13/14/15 与 Figure 2a/3/4/5/7/8
+- [src/benchmark/AnnotationSplit.ts](./src/benchmark/AnnotationSplit.ts)
+  - 精确保留 80/40/80 的分层任务级划分
+
+论文复现脚本：`scripts/create-annotation-template.ts`、`export-annotation-split.ts`、
+`fit-hierarchical-calibration.ts`、`sample-paper-corpus.ts`、`export-detector-specs.ts`、
+`run-ablation-study.ts`、`analyze-intervention-validation.ts`、`analyze-common-environment.ts`、
+`paired-system-tests.ts`。
 
 ## 数据流
 

@@ -15,6 +15,11 @@ import {
   aggregateObservedBenchmarkSummaries,
   reportToObservedTrajectoryRecord,
 } from '../src/benchmark/ObservedBenchmarkExperiments';
+import { DEFAULT_EVALUATION_CONFIG } from '../src/config/evaluation.config';
+import {
+  PaperCalibrationProfile,
+  validateCalibrationProfile,
+} from '../src/benchmark/HierarchicalCalibration';
 
 type BenchmarkConfig = {
   name: string;
@@ -132,7 +137,8 @@ async function evaluateTrajectory(
   outRoot: string,
   variant: string,
   saveReports: boolean,
-  quiet: boolean
+  quiet: boolean,
+  calibrationProfile?: PaperCalibrationProfile
 ): Promise<ObservedTrajectoryRecord> {
   const safeTrial = loaded.metadata.trialId || 'single';
   const targetDir = path.join(
@@ -143,7 +149,18 @@ async function evaluateTrajectory(
   );
   ensureDir(targetDir);
 
-  const evaluator = new AgentEvaluator(loaded.sessionData);
+  const evaluationConfig = calibrationProfile
+    ? {
+        ...DEFAULT_EVALUATION_CONFIG,
+        paperCalibration: {
+          benchmark: loaded.metadata.benchmark,
+          defects: calibrationProfile.defects,
+        },
+      }
+    : DEFAULT_EVALUATION_CONFIG;
+  const evaluator = new AgentEvaluator(loaded.sessionData, evaluationConfig, {
+    paperControlPreservation: true,
+  });
   let reportPath: string | undefined;
   const report = await withOptionalQuiet(quiet, async () => {
     if (!saveReports) {
@@ -289,53 +306,45 @@ function writeExperimentStatusMarkdown(outPath: string, records: ObservedTraject
       'was generated or blocked and what input each blocked artifact still needs.'
   );
   lines.push('');
-  lines.push('| RQ | Paper artifact | Needs | Available from this run |');
-  lines.push('|---|---|---|---|');
+  lines.push('| Paper artifact | Needs | Available from this run |');
+  lines.push('|---|---|---|');
   lines.push(
-    `| RQ1 | Table 1 left: per-defect precision / recall / F1 / AP / AUROC | Process-level human annotations (\`--annotations\`) | No: this repository ships no annotation data. Detector outputs are ready; supply your own annotated set. |`
+    `| Table 1 / Table 7 / Table 13 / Figure 7 | Process-level human annotations (\`--annotations\`) + split | No: no annotation data is shipped. |`
   );
   lines.push(
-    `| RQ1 | Figure 2 left: defect-failure association | Endpoint outcomes only | ${withOutcome > 0 ? 'Yes' : 'No: no trajectory carries an endpoint outcome'} |`
+    `| Table 2 / Table 8 / Table 10 / Table 12 / Table 14 | >= 1 labelled system; cross-system tables need >= 2 | ${systemNames.length >= 2 ? `Yes, for ${systemNames.length} system(s)` : `Partial: ${systemNames.length} system(s)`} |`
   );
   lines.push(
-    `| RQ2 | Table 1 right: ECE, hard threshold vs calibrated posterior | Human annotations | No: same annotation dependency as Table 1 left. |`
+    `| Table 4 / Table 5 | annotations + split | No: annotation data is missing. |`
   );
   lines.push(
-    `| RQ2 | Figure 7: reliability diagrams | Human annotations | No: same annotation dependency. |`
+    `| Table 6 / Figure 2a / Figure 6 | endpoint outcomes + >= 2 systems | ${withOutcome > 0 ? 'Partial or yes, depending on systems' : 'No: no endpoint outcome'} |`
   );
   lines.push(
-    `| RQ3 | Table 2: cross-system scorecard (PB, Qctx, Qtool, Qwf, Qeco, CP, fragile success) | >= 1 labelled system | ${systemNames.length >= 1 ? `Yes, for ${systemNames.length} system(s)` : 'No'} |`
+    `| Figure 2 left / Figure 4 / Figure 5 / Figure 8 | trajectories | ${records.length > 0 ? 'Yes' : 'No'} |`
   );
   lines.push(
-    `| RQ3 | Table 4 / Figure 4: outcome ranking vs ProcCtrlBench ranking | Endpoint outcomes + >= 2 systems | ${withOutcome > 0 && systemNames.length >= 2 ? 'Yes' : 'Partial: needs endpoint outcomes across at least two systems'} |`
+    `| Table 3 | detector specification config | Yes: run scripts/export-detector-specs.ts |`
   );
   lines.push(
-    `| RQ3 | Table 6 / Figure 5: bootstrap ranking stability and CIs | >= 2 systems | ${systemNames.length >= 2 ? 'Yes' : `No: only ${systemNames.length} system present; pass a distinct --variant per agent-model configuration`} |`
+    `| Table 9 | held-out intervention/breakdown labels | No: labels are not shipped. |`
   );
   lines.push(
-    `| RQ3 | Figure 3: per-defect system profiles | >= 1 system | ${records.length > 0 ? 'Yes' : 'No'} |`
+    `| Table 11 | 44 intervention runs | No: intervention data is not shipped. |`
   );
   lines.push(
-    `| RQ3 | Figure 6: inter-defect correlation matrix | >= 2 trajectories | ${records.length >= 2 ? 'Yes' : 'No'} |`
-  );
-  lines.push(
-    `| RQ4 | Table 3: scenario-specific PB per task source | Trajectories per source | ${benchmarkNames.length > 0 ? `Yes, for: ${benchmarkNames.join(', ')}` : 'No'} |`
-  );
-  lines.push(
-    `| RQ4 | Table 7: control-preservation subdimension breakdown | >= 1 system | ${records.length > 0 ? 'Yes' : 'No'} |`
-  );
-  lines.push(
-    `| - | Figure 8: eta sensitivity sweep | >= 1 system | ${records.length > 0 ? 'Yes' : 'No'} |`
+    `| Table 15 | common-environment runs | Partial: Qpolicy/Qinfra can be computed; commonEnvPB needs dedicated runs. |`
   );
   lines.push('');
   lines.push('## How to read this');
   lines.push('');
   lines.push(
-    'These outputs are real measurements over the trajectories present in this directory. The paper reports ' +
+    'These outputs are real measurements over the trajectories present in this directory. The paper v8 reports ' +
       '200 annotated cases across 11 agent-model configurations; unless this run covers that same set, the ' +
       'numbers here are a partial instantiation of the benchmark rather than a reproduction of the ' +
-      'published table values. Nothing in this pipeline fabricates annotation-dependent numbers: artifacts ' +
-      'without the required inputs are reported as blocked.'
+      'published table values. Use scripts/sample-paper-corpus.ts to check the 11-system composition and ' +
+      'see paper-corpus-gaps.md for missing runs. Nothing in this pipeline fabricates annotation-dependent ' +
+      'numbers: artifacts without the required inputs are reported as blocked or partial.'
   );
   lines.push('');
   lines.push('See `docs/reproducing_paper_results.md` for the full end-to-end procedure.');
@@ -358,6 +367,20 @@ async function main() {
   const quiet = args.quiet === 'true';
   const resume = args.resume !== 'false';
   const saveReports = args['save-reports'] === 'true';
+  let calibrationProfile: PaperCalibrationProfile | undefined;
+  if (args['calibration-profile']) {
+    const profilePath = path.resolve(args['calibration-profile']);
+    calibrationProfile = JSON.parse(
+      fs.readFileSync(profilePath, 'utf-8')
+    ) as PaperCalibrationProfile;
+    const errors = validateCalibrationProfile(calibrationProfile);
+    if (errors.length > 0) {
+      throw new Error(
+        `Invalid calibration profile ${profilePath}: ${errors.slice(0, 5).join('; ')}`
+      );
+    }
+    console.log(`Loaded hierarchical calibration profile: ${profilePath}`);
+  }
   const startIndex = args['start-index'] ? Number(args['start-index']) : 0;
   const limitPerBenchmark = args['limit-per-benchmark']
     ? Number(args['limit-per-benchmark'])
@@ -392,7 +415,14 @@ async function main() {
         try {
           const loaded = loadBenchmarkTrajectory(file, config.source);
           console.log(`Evaluating ${loaded.metadata.benchmark}: ${loaded.metadata.taskId} / ${loaded.metadata.trialId || 'single'}`);
-          const row = await evaluateTrajectory(loaded, path.join(outRoot, 'reports'), variant, saveReports, quiet);
+          const row = await evaluateTrajectory(
+            loaded,
+            path.join(outRoot, 'reports'),
+            variant,
+            saveReports,
+            quiet,
+            calibrationProfile
+          );
           appendJsonl(recordsJsonlPath, row);
           completedRawPaths.add(file);
         } catch (error) {

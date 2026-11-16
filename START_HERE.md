@@ -8,9 +8,11 @@
 
 ## 你需要先知道的事
 
-- 当前系统是非评分制。
-- 产出是诊断报告，不是 100 分制分数。
+- 单会话诊断报告是非评分制的，不输出 100 分制分数。
+- 论文复现层（`src/benchmark/*`、`scripts/*paper*`）会输出 `Qctx/Qtool/Qwf/Qeco/CP/PB`
+  记分卡；`PB` 使用论文 v8 的 `eta = 0.70`。
 - 如果你要启用 AST 与项目关系增强，先配置项目分析，再评估 session。
+- 论文复现的数据要求与脚本见 [docs/reproducing_paper_results.md](./docs/reproducing_paper_results.md)。
 
 ## 最短路径
 

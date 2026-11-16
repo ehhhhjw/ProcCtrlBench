@@ -338,7 +338,9 @@ export async function evaluateCodexTranscriptToObservedRecord(
   ensureDir(reportDir);
   const session = loadCodexRolloutSession(transcriptPath);
   const report = await withTreeSitterDisabledForRollout(async () => {
-    const evaluator = new AgentEvaluator(session);
+    const evaluator = new AgentEvaluator(session, undefined, {
+      paperControlPreservation: true,
+    });
     return evaluator.evaluateAndSave(reportDir, ['json', 'markdown']);
   });
   const reportJson = fs

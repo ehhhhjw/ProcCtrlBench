@@ -1,6 +1,11 @@
 # 评测指标实现总览
 
-本文件描述当前代码实现下的指标体系。当前系统是非评分制评估，重点是：
+本文件描述单会话诊断层的指标体系（非评分制）。论文复现层另外使用
+`src/benchmark/ProcCtrlScorecard.ts`（Qctx/Qtool/Qwf/Qeco/CP/PB，η=0.70）与
+`src/benchmark/HierarchicalCalibration.ts`（层次贝叶斯校准）；完整口径见
+[docs/reproducing_paper_results.md](./reproducing_paper_results.md)。
+
+当前诊断层重点是：
 
 - 产生 issue
 - 产生 finding
